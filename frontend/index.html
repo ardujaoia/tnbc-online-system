@@ -1,0 +1,3032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智破三阴 | TNBC智能诊疗系统</title>
+  <script src="/vendor/tailwindcss.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: "#1E3A5F",
+            medical: "#2C6E9E",
+            mist: "#EAF3FA",
+            surface: "#F5F9FC",
+            borderline: "#D3E2EE"
+          },
+          boxShadow: {
+            soft: "0 20px 45px rgba(30, 58, 95, 0.12)",
+            panel: "0 8px 24px rgba(44, 110, 158, 0.12)"
+          },
+          backgroundImage: {
+            "medical-gradient": "linear-gradient(135deg, rgba(30,58,95,1) 0%, rgba(44,110,158,0.94) 58%, rgba(115,186,220,0.88) 100%)"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --brand: #1e3a5f;
+      --medical: #2c6e9e;
+      --mist: #eaf3fa;
+      --surface: #f5f9fc;
+      --borderline: #d3e2ee;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(44, 110, 158, 0.10), transparent 28%),
+        radial-gradient(circle at left center, rgba(30, 58, 95, 0.08), transparent 24%),
+        linear-gradient(180deg, #f9fcff 0%, #f3f8fb 100%);
+      color: #23405b;
+    }
+
+    .hero-grid {
+      background-image:
+        linear-gradient(rgba(44, 110, 158, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(44, 110, 158, 0.05) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: radial-gradient(circle at center, black 32%, transparent 92%);
+    }
+
+    .page-enter {
+      animation: pageEnter 0.45s ease;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(18px);
+    }
+
+    .force-canvas {
+      background:
+        radial-gradient(circle at 20% 20%, rgba(44, 110, 158, 0.16), transparent 26%),
+        radial-gradient(circle at 80% 30%, rgba(30, 58, 95, 0.12), transparent 22%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(234, 243, 250, 0.86));
+    }
+
+    .connection-line {
+      stroke: rgba(44, 110, 158, 0.40);
+      stroke-width: 2;
+      stroke-dasharray: 7 7;
+      animation: dashFlow 14s linear infinite;
+    }
+
+    .heat-cell {
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .heat-cell:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 12px 22px rgba(44, 110, 158, 0.18);
+    }
+
+    .node-pulse {
+      animation: nodePulse 2.8s ease-in-out infinite;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(211, 226, 238, 0.55);
+      border-radius: 9999px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(44, 110, 158, 0.38);
+      border-radius: 9999px;
+    }
+
+    @keyframes pageEnter {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes nodePulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(44, 110, 158, 0.18);
+      }
+      50% {
+        transform: scale(1.03);
+        box-shadow: 0 0 0 12px rgba(44, 110, 158, 0);
+      }
+    }
+
+    @keyframes dashFlow {
+      to {
+        stroke-dashoffset: -84;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="/vendor/react.development.js"></script>
+  <script src="/vendor/react-dom.development.js"></script>
+  <script src="/vendor/prop-types.min.js"></script>
+  <script src="/vendor/babel.min.js"></script>
+  <script src="/vendor/Recharts.min.js"></script>
+  <script src="/vendor/feather.min.js"></script>
+
+  <script type="text/babel" data-presets="env,react">
+    const { useEffect, useMemo, useState } = React;
+    const rechartsReady = !!window.Recharts;
+    const {
+      ResponsiveContainer,
+      LineChart,
+      Line,
+      CartesianGrid,
+      XAxis,
+      YAxis,
+      Tooltip,
+      Legend,
+      BarChart,
+      Bar,
+      PieChart,
+      Pie,
+      Cell
+    } = window.Recharts || {};
+
+    const API_BASE = "";
+
+    async function fetchJSON(path) {
+      const response = await fetch(`${API_BASE}${path}`, {
+        headers: { Accept: "application/json" }
+      });
+      if (!response.ok) {
+        throw new Error(`API ${response.status}: ${path}`);
+      }
+      return response.json();
+    }
+
+    const navItems = [
+      { id: "dashboard", label: "工作台", icon: "home" },
+      { id: "multimodal", label: "多模态数据管理", icon: "database" },
+      { id: "upload", label: "新患者上传", icon: "upload-cloud" },
+      { id: "prediction", label: "化疗敏感性预测", icon: "activity" },
+      { id: "subtyping", label: "三阴性识别", icon: "layers" },
+      { id: "recommendation", label: "治疗方案推荐", icon: "clipboard" },
+      { id: "graph", label: "知识图谱可视化", icon: "share-2" },
+      { id: "explain", label: "模型可解释性", icon: "bar-chart-2" },
+      { id: "history", label: "历史病例与报告", icon: "file-text" },
+      { id: "settings", label: "系统设置", icon: "settings" }
+    ];
+
+    const focusPatient = {
+      id: "FUDAN-TNBC-024",
+      age: "48岁",
+      stage: "cT2N1M0",
+      subtype: "TNBC已筛出 / ER-/PR-/HER2-",
+      sensitivity: 87,
+      completeness: 93,
+      pcr: "78.6%"
+    };
+
+    const summaryCards = [
+      { title: "累计病例", value: "1,286", delta: "+12.4%", icon: "users" },
+      { title: "多模态完整率", value: "92.6%", delta: "+3.1%", icon: "check-circle" },
+      { title: "高敏感预测", value: "346", delta: "+8.7%", icon: "trending-up" },
+      { title: "待复核报告", value: "18", delta: "-2.3%", icon: "clipboard" }
+    ];
+
+    const dashboardAlerts = [
+      {
+        title: "疑似耐药信号",
+        desc: "EGFR 轻度上调且局部低灌注区存在，建议第 2 疗程后重点复评。",
+        tone: "warn",
+        tag: "需关注"
+      },
+      {
+        title: "病例完整度提升",
+        desc: "新增 28 例已完成影像、病理、基因三模态对齐，可用于路演样本池展示。",
+        tone: "success",
+        tag: "正常"
+      },
+      {
+        title: "模型服务稳定",
+        desc: "最近 24 小时平均响应时延 218ms，在线推断与报告导出链路正常。",
+        tone: "info",
+        tag: "在线"
+      }
+    ];
+
+    const serviceStats = [
+      { label: "Latency", value: "218ms", tone: "bg-slate-900 text-white" },
+      { label: "Throughput", value: "73/min", tone: "bg-blue-50 text-blue-700" },
+      { label: "GPU", value: "71%", tone: "bg-cyan-50 text-cyan-700" },
+      { label: "报告签发", value: "19份", tone: "bg-slate-100 text-slate-700" }
+    ];
+
+    const trendData = [
+      { month: "01月", 新增病例: 142, 建模完成: 116, pCR随访: 76 },
+      { month: "02月", 新增病例: 168, 建模完成: 135, pCR随访: 92 },
+      { month: "03月", 新增病例: 174, 建模完成: 151, pCR随访: 110 },
+      { month: "04月", 新增病例: 195, 建模完成: 168, pCR随访: 126 },
+      { month: "05月", 新增病例: 222, 建模完成: 184, pCR随访: 138 },
+      { month: "06月", 新增病例: 246, 建模完成: 202, pCR随访: 151 }
+    ];
+
+    const modalityData = [
+      { name: "MRI影像", 数量: 1014 },
+      { name: "病理切片", 数量: 1188 },
+      { name: "转录组", 数量: 873 },
+      { name: "临床指标", 数量: 1241 }
+    ];
+
+    const subtypeCards = [
+      {
+        key: "ER-",
+        title: "ER阴性证据",
+        score: 0.78,
+        desc: "ESR1 表达越低，越支持雌激素受体阴性。",
+        accent: "from-slate-700 to-brand"
+      },
+      {
+        key: "PR-",
+        title: "PR阴性证据",
+        score: 0.82,
+        desc: "PGR 表达越低，越支持孕激素受体阴性。",
+        accent: "from-sky-500 to-medical"
+      },
+      {
+        key: "HER2-",
+        title: "HER2阴性证据",
+        score: 0.74,
+        desc: "ERBB2/GRB7 轴越低，越支持 HER2 阴性。",
+        accent: "from-cyan-500 to-sky-600"
+      },
+      {
+        key: "TNBC",
+        title: "三阴性综合判定",
+        score: 0.86,
+        desc: "ER、PR、HER2 三项均阴性时，进入 TNBC 队列。",
+        accent: "from-teal-500 to-cyan-600"
+      }
+    ];
+
+    const heatmapRows = [
+      { marker: "ESR1低表达", ER: 0.88, PR: 0.32, HER2: 0.22, TNBC: 0.76 },
+      { marker: "PGR低表达", ER: 0.28, PR: 0.91, HER2: 0.24, TNBC: 0.79 },
+      { marker: "ERBB2/GRB7低表达", ER: 0.22, PR: 0.25, HER2: 0.84, TNBC: 0.74 },
+      { marker: "三阴性综合", ER: 0.82, PR: 0.85, HER2: 0.78, TNBC: 0.88 },
+      { marker: "队列筛选证据", ER: 0.72, PR: 0.76, HER2: 0.70, TNBC: 0.92 },
+      { marker: "RNA-seq复核", ER: 0.68, PR: 0.73, HER2: 0.66, TNBC: 0.71 }
+    ];
+
+    const featureImportance = [
+      { name: "Ki-67", value: 0.92 },
+      { name: "TILs", value: 0.84 },
+      { name: "PD-L1", value: 0.79 },
+      { name: "TP53", value: 0.74 },
+      { name: "TMB", value: 0.61 },
+      { name: "AR", value: 0.52 },
+      { name: "EMT", value: 0.48 }
+    ];
+
+    const predictionContributions = [
+      { name: "影像纹理特征", value: 31, note: "边缘强化与 ADC 下降支撑含铂获益判断" },
+      { name: "病理微环境", value: 27, note: "Ki-67 升高与中等 TILs 提高应答评分" },
+      { name: "基因组信号", value: 23, note: "TP53 突变与 HRD 倾向支持高敏感预测" },
+      { name: "临床指标", value: 19, note: "分期与肿瘤体积对最终置信区间进行校准" }
+    ];
+
+    const positiveSignals = [
+      "Ki-67 高表达，提示新辅助化疗获益潜力较高。",
+      "BRCA1/HRD 倾向支持含铂方案敏感性增强。",
+      "病灶边缘强化明显，符合高反应性影像模式。"
+    ];
+
+    const riskSignals = [
+      "EGFR 轻度上调可能带来局部耐药倾向。",
+      "局部低灌注区提示坏死背景，建议影像复核。",
+      "免疫浸润尚未达到强免疫型阈值，联合免疫需结合 MDT。"
+    ];
+
+    const historyCases = [
+      {
+        id: "FUDAN-TNBC-024",
+        patient: "患者A",
+        subtype: "TNBC",
+        regimen: "TCb→AC + IO",
+        sensitivity: "高",
+        pcr: "73%",
+        date: "2026-04-18",
+        status: "已归档",
+        report: "化疗敏感性综合报告.pdf"
+      },
+      {
+        id: "FUDAN-TNBC-017",
+        patient: "患者B",
+        subtype: "TNBC",
+        regimen: "AC→T + Pembrolizumab",
+        sensitivity: "中高",
+        pcr: "68%",
+        date: "2026-04-15",
+        status: "已签发",
+        report: "免疫联合方案建议.pdf"
+      },
+      {
+        id: "FUDAN-TNBC-009",
+        patient: "患者C",
+        subtype: "TNBC",
+        regimen: "Paclitaxel + Carboplatin",
+        sensitivity: "中",
+        pcr: "42%",
+        date: "2026-04-11",
+        status: "已归档",
+        report: "多模态分析摘要.pdf"
+      },
+      {
+        id: "FUDAN-TNBC-002",
+        patient: "患者D",
+        subtype: "待复核",
+        regimen: "化疗 + PI3K 观察方案",
+        sensitivity: "中低",
+        pcr: "31%",
+        date: "2026-04-06",
+        status: "待复审",
+        report: "三阴性筛选报告.pdf"
+      }
+    ];
+
+    const graphNodes = [
+      { id: "patient", label: "患者", x: 50, y: 10, color: "from-brand to-medical", desc: "病例核心实体，关联多模态证据与治疗决策链。" },
+      { id: "mri", label: "MRI影像", x: 18, y: 28, color: "from-sky-500 to-blue-500", desc: "汇聚 DCE-MRI、DWI 与 ADC 等影像纹理和强化模式。" },
+      { id: "pathology", label: "病理切片", x: 79, y: 28, color: "from-cyan-500 to-sky-500", desc: "体现肿瘤细胞密度、坏死区、TILs 与形态结构证据。" },
+      { id: "gene", label: "基因组", x: 20, y: 66, color: "from-indigo-500 to-blue-600", desc: "整合 TP53、BRCA1、HRD 与免疫相关分子特征。" },
+      { id: "subtype", label: "TNBC识别", x: 50, y: 54, color: "from-brand to-slate-700", desc: "判断 ER、PR、HER2 是否均为阴性，筛出三阴性乳腺癌病例。" },
+      { id: "pdl1", label: "PD-L1", x: 80, y: 63, color: "from-teal-500 to-cyan-600", desc: "免疫治疗适配窗口的关键参考节点。" },
+      { id: "pcr", label: "pCR概率", x: 39, y: 86, color: "from-sky-600 to-medical", desc: "对新辅助治疗后病理完全缓解可能性的综合推断。" },
+      { id: "plan", label: "联合方案", x: 68, y: 86, color: "from-blue-500 to-brand", desc: "将化疗、免疫与靶向路径合并形成个体化推荐。" }
+    ];
+
+    const graphEdges = [
+      ["patient", "mri", "影像采集"],
+      ["patient", "pathology", "病理确证"],
+      ["patient", "gene", "组学检测"],
+      ["mri", "subtype", "形态表征"],
+      ["pathology", "subtype", "组织学特征"],
+      ["gene", "subtype", "分子证据"],
+      ["subtype", "pcr", "敏感性推断"],
+      ["pdl1", "plan", "免疫适配"],
+      ["subtype", "plan", "方案筛选"],
+      ["pcr", "plan", "疗效强化"]
+    ];
+
+    const recommendationBlocks = [
+      {
+        title: "新辅助化疗建议",
+        tag: "优先推荐",
+        color: "bg-blue-50 text-blue-700",
+        items: [
+          "紫杉醇 + 卡铂序贯蒽环类方案，预计化疗敏感性高。",
+          "建议每 2 周复评影像缩瘤率与 ctDNA 变化。"
+        ]
+      },
+      {
+        title: "免疫联合建议",
+        tag: "可重点考虑",
+        color: "bg-cyan-50 text-cyan-700",
+        items: [
+          "PD-L1 阳性倾向明显，可考虑联合免疫检查点抑制剂。",
+          "建议结合 TILs 与炎症因子面板进行再次确认。"
+        ]
+      },
+      {
+        title: "靶向探索建议",
+        tag: "需进一步验证",
+        color: "bg-slate-100 text-slate-700",
+        items: [
+          "若 HRD 指标升高，可评估 PARP 抑制剂获益可能。",
+          "若 ER、PR 或 HER2 任一复核不支持阴性，则不能直接进入 TNBC 预测流程。"
+        ]
+      }
+    ];
+
+    const timelineSteps = [
+      { title: "基线评估", desc: "影像、病理、组学统一入库" },
+      { title: "TNBC筛选", desc: "先识别三阴性，再进入化疗敏感性预测" },
+      { title: "MDT决策", desc: "结合免疫与靶向证据调整治疗" },
+      { title: "疗效复盘", desc: "纳入随访与真实世界数据闭环" }
+    ];
+
+    function Icon({ name, className = "" }) {
+      return <i data-feather={name} className={className}></i>;
+    }
+
+    function MockBadge() {
+      return (
+        <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700">
+          <span className="h-2 w-2 rounded-full bg-cyan-500"></span>
+          后端接口
+        </span>
+      );
+    }
+
+    function SoftCard({ children, className = "" }) {
+      return (
+        <div className={`glass-card rounded-3xl border border-white/70 shadow-panel transition duration-300 hover:-translate-y-1 hover:shadow-soft ${className}`}>
+          {children}
+        </div>
+      );
+    }
+
+    function PageHeader({ title, subtitle, right }) {
+      return (
+        <div className="mb-6 flex flex-col gap-4 rounded-[28px] bg-medical-gradient px-6 py-6 text-white shadow-soft lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-3xl">
+            <MockBadge />
+            <h1 className="mt-4 text-2xl font-bold tracking-wide sm:text-3xl">{title}</h1>
+            <p className="mt-3 text-sm leading-7 text-slate-100/90 sm:text-base">{subtitle}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:min-w-[360px]">
+            {right}
+          </div>
+        </div>
+      );
+    }
+
+    function TinyInfo({ label, value }) {
+      return (
+        <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-100/80">{label}</p>
+          <p className="mt-2 break-all text-base font-semibold leading-tight text-white">{value}</p>
+        </div>
+      );
+    }
+
+    function PatientSelector({ patients = [], selectedPatientId, onSelectPatient, loading = false }) {
+      if (!patients.length) {
+        return null;
+      }
+
+      return (
+        <div className="rounded-2xl border border-borderline bg-white px-4 py-3">
+          <p className="text-xs text-slate-400">病例选择</p>
+          <select
+            value={selectedPatientId || ""}
+            onChange={(event) => onSelectPatient(event.target.value)}
+            disabled={loading}
+            className="mt-1 w-full min-w-[190px] bg-transparent text-sm font-semibold text-brand outline-none disabled:opacity-60"
+            aria-label="选择病例"
+          >
+            {patients.map((patient) => (
+              <option key={patient.patient_id} value={patient.patient_id}>
+                {patient.patient_id} · {patient.split || "set"} · {patient.label === 0 ? "DFS敏感代理" : "复发耐药代理"}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
+
+    function SectionTitle({ title, desc }) {
+      return (
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-brand">{title}</h2>
+            <p className="mt-1 text-sm text-slate-500">{desc}</p>
+          </div>
+          <MockBadge />
+        </div>
+      );
+    }
+
+    function PathologyPatchGallery({ preview = null, title = "病理 Patch 缩略图", desc = "随当前病例切换同步刷新真实 patch 图片" }) {
+      const items = preview?.items || [];
+      if (!items.length) {
+        return null;
+      }
+      const mappedCount = preview?.mapped_attention_count || 0;
+
+      return (
+        <SoftCard className="p-5">
+          <SectionTitle
+            title={title}
+            desc={`${desc}，共 ${preview.slide_count || 0} 张切片 / ${preview.patch_image_count || 0} 个 patch，已映射 ${mappedCount} 个注意力热区`}
+          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+            {items.slice(0, 12).map((item, index) => {
+              const hasAttention = item.attention !== null && item.attention !== undefined;
+              return (
+                <figure key={`${item.slide_id}-${item.patch_row}-${index}`} className="overflow-hidden rounded-2xl border border-borderline bg-white">
+                  <div className="aspect-square bg-slate-100">
+                    <img
+                      src={item.url || item.image_url}
+                      alt={`${item.slide_id} patch ${item.patch_row}`}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                  <figcaption className="space-y-2 px-3 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        item.source === "model_attention"
+                          ? "bg-blue-50 text-blue-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {item.source === "model_attention" ? "模型热区" : "代表切块"}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-400">row {item.patch_row}</span>
+                    </div>
+                    <p className="truncate text-xs font-semibold text-brand" title={item.tcga_barcode || item.slide_id}>
+                      {item.tcga_barcode || item.slide_id}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {hasAttention ? `attention ${(item.attention * 100).toFixed(3)}%` : `X${item.x ?? "-"} / Y${item.y ?? "-"}`}
+                    </p>
+                  </figcaption>
+                </figure>
+              );
+            })}
+          </div>
+        </SoftCard>
+      );
+    }
+
+    function MriEvidencePanel({ evidence = null, compact = false } = {}) {
+      if (!evidence) {
+        return null;
+      }
+      const summary = evidence.summary || {};
+      const available = evidence.status === "available";
+      const signals = evidence.signals || [];
+      const previews = evidence.previews || [];
+      const roleItems = evidence.roleItems || [];
+
+      return (
+        <SoftCard className="p-5">
+          <SectionTitle
+            title="MRI影像证据"
+            desc={available ? "当前病例已接入 MRI 特征，用于补充影像表型证据" : "当前病例缺少 MRI，但系统保留 MRI 资产库和三模态接入能力"}
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <HighlightTile label="当前MRI状态" value={evidence.statusText || "待检查"} tone={available ? "dark" : "light"} />
+            <HighlightTile label="MRI资产库" value={`${summary.assetPatients || 0}例`} tone="blue" />
+            <HighlightTile label="完整对齐TNBC" value={`${summary.alignedPatients || 0}例`} />
+            <HighlightTile label="已提取特征" value={available ? `${summary.featureDim || 0}维` : `${summary.featurePatients || 0}例`} />
+          </div>
+
+          {available ? (
+            <div className="mt-5 grid gap-5 xl:grid-cols-[1.1fr,1fr]">
+              <div>
+                <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-borderline bg-surface px-4 py-3">
+                    <p className="text-xs text-slate-400">筛选序列</p>
+                    <p className="mt-1 text-lg font-bold text-brand">{summary.selectedSeries || 0}</p>
+                  </div>
+                  <div className="rounded-2xl border border-borderline bg-surface px-4 py-3">
+                    <p className="text-xs text-slate-400">DICOM切片</p>
+                    <p className="mt-1 text-lg font-bold text-brand">{summary.totalDicom || 0}</p>
+                  </div>
+                  <div className="rounded-2xl border border-borderline bg-surface px-4 py-3">
+                    <p className="text-xs text-slate-400">平均分辨率</p>
+                    <p className="mt-1 text-lg font-bold text-brand">{summary.meanResolution || "未知"}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {signals.map((item) => (
+                    <div key={item.label}>
+                      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                        <span className="font-medium text-slate-600">{item.label}</span>
+                        <span className="font-semibold text-brand">
+                          {item.value}{item.unit ? ` ${item.unit}` : ""} · 队列{Math.round(item.percentile)}%
+                        </span>
+                      </div>
+                      <div className="h-3 rounded-full bg-slate-100">
+                        <div
+                          className="h-3 rounded-full bg-gradient-to-r from-brand via-medical to-cyan-400"
+                          style={{ width: `${Math.max(0, Math.min(100, item.percentile || 0))}%` }}
+                        ></div>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{item.note}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                {previews.length ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    {previews.slice(0, compact ? 3 : 6).map((item) => (
+                      <figure key={item.url} className="overflow-hidden rounded-2xl border border-borderline bg-white">
+                        <div className="aspect-square bg-slate-100">
+                          <img src={item.url} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+                        </div>
+                        <figcaption className="truncate px-2 py-2 text-xs text-slate-500">{item.title}</figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-borderline bg-surface px-4 py-8 text-center text-sm text-slate-500">
+                    当前 MRI 特征存在，但没有可展示预览图。
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          <div className={`mt-5 rounded-2xl px-4 py-4 text-sm leading-7 ${
+            available ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"
+          }`}>
+            {evidence.interpretation}
+          </div>
+
+          {!compact ? (
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              {roleItems.map((item) => (
+                <div key={item} className="rounded-2xl border border-borderline bg-surface px-4 py-4 text-sm leading-7 text-slate-600">
+                  {item}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </SoftCard>
+      );
+    }
+
+    function FeaturePackageUploadCard({ className = "" } = {}) {
+      const [uploadSpec, setUploadSpec] = useState(null);
+      const [uploadResult, setUploadResult] = useState({
+        status: "idle",
+        text: "请选择预处理后的 JSON 特征包，系统会调用同一个后端模型完成推断。"
+      });
+
+      useEffect(() => {
+        let cancelled = false;
+        fetchJSON("/api/upload-spec")
+          .then((data) => {
+            if (!cancelled) setUploadSpec(data);
+          })
+          .catch(() => {
+            if (!cancelled) setUploadSpec(null);
+          });
+        return () => {
+          cancelled = true;
+        };
+      }, []);
+
+      const handleFeaturePackageUpload = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+          return;
+        }
+        setUploadResult({ status: "loading", text: `正在读取 ${file.name}...` });
+        try {
+          const payload = JSON.parse(await file.text());
+          const result = await fetch(`${API_BASE}/api/predict-uploaded`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await result.json();
+          if (!result.ok) {
+            throw new Error(data.error || "上传失败");
+          }
+          setUploadResult({
+            status: "success",
+            text: `${data.patient_id} 推断完成：DFS代理敏感 ${data.sensitivity_score}%，复发/耐药风险 ${data.resistance_score}%`
+          });
+        } catch (error) {
+          setUploadResult({
+            status: "error",
+            text: error.message || "特征包格式不符合接口要求"
+          });
+        } finally {
+          event.target.value = "";
+        }
+      };
+
+      const specRows = uploadSpec?.required_fields
+        ? [
+            ["接口", `${uploadSpec.method || "POST"} ${uploadSpec.endpoint || "/api/predict-uploaded"}`],
+            ["病理patch特征", uploadSpec.required_fields.image_patch_features],
+            ["RNA-seq特征", uploadSpec.required_fields.gene_profile],
+            ["患者结构化特征", uploadSpec.required_fields.patient_features]
+          ]
+        : [["接口状态", "等待后端返回上传规范"]];
+
+      return (
+        <SoftCard className={`p-5 ${className}`}>
+          <SectionTitle title="新患者特征包上传" desc="单独接入新病例的预处理特征包，上传后直接调用后端模型推断" />
+          <div className="grid gap-5 xl:grid-cols-[1fr,1.2fr]">
+            <label className="flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-borderline bg-surface px-5 py-8 text-center transition hover:border-medical hover:bg-blue-50">
+              <Icon name="upload-cloud" className="h-10 w-10 text-medical" />
+              <span className="mt-4 text-base font-semibold text-brand">选择 JSON 特征包</span>
+              <span className="mt-3 max-w-md text-sm leading-7 text-slate-500">
+                这里不上传原始 WSI、MRI 或 RNA-seq 大文件，只接收已经预处理好的模型输入特征。
+              </span>
+              <input type="file" accept="application/json,.json" className="hidden" onChange={handleFeaturePackageUpload} />
+            </label>
+
+            <div>
+              <div className="grid gap-3">
+                {specRows.map(([label, value]) => (
+                  <div key={label} className="rounded-2xl border border-borderline bg-white px-4 py-3">
+                    <p className="text-xs font-semibold text-slate-400">{label}</p>
+                    <p className="mt-1 break-all text-sm leading-6 text-brand">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className={`mt-4 rounded-2xl px-4 py-4 text-sm leading-7 ${
+                uploadResult.status === "success"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : uploadResult.status === "error"
+                    ? "bg-amber-50 text-amber-700"
+                    : uploadResult.status === "loading"
+                      ? "bg-slate-100 text-slate-700"
+                      : "bg-blue-50 text-blue-700"
+              }`}>
+                {uploadResult.text}
+              </div>
+              {uploadSpec?.note ? (
+                <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800">
+                  {uploadSpec.note}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </SoftCard>
+      );
+    }
+
+    function PrognosisPanel({ prognosis = null, compact = false } = {}) {
+      if (!prognosis || !prognosis.endpoints?.length) {
+        return null;
+      }
+      const endpoints = prognosis.endpoints || [];
+      const clinical = prognosis.clinicalContext || {};
+      const dfs = endpoints.find((item) => item.key === "dfs") || {};
+      const os = endpoints.find((item) => item.key === "os") || {};
+      const follow = endpoints.find((item) => item.key === "follow_up") || {};
+      const pcr = endpoints.find((item) => item.key === "pcr_external") || {};
+      const contextRows = [
+        ["病理分期", clinical.stage || "缺失"],
+        ["T分期", clinical.t_stage || "缺失"],
+        ["切缘状态", clinical.margin_status || "缺失"],
+        ["当前肿瘤状态", clinical.person_neoplasm_status || "缺失"],
+        ["TMB", clinical.tmb || "缺失"],
+        ["基因组改变比例", clinical.fraction_genome_altered || "缺失"]
+      ];
+
+      return (
+        <SoftCard className="p-5">
+          <SectionTitle
+            title="多终点预后评估"
+            desc="整合 DFS、OS、最后随访肿瘤状态，并标注外部真实 pCR 验证队列"
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <HighlightTile label="综合预后状态" value={prognosis.overallStatus || "待评估"} tone={prognosis.riskEventCount ? "blue" : "dark"} />
+            <HighlightTile label="DFS状态/时间" value={`${dfs.status || "缺失"} · ${dfs.time || "缺失"}`} />
+            <HighlightTile label="OS状态/时间" value={`${os.status || "缺失"} · ${os.time || "缺失"}`} />
+            <HighlightTile label="GEO pCR外部队列" value={pcr.time || "待接入"} tone="blue" />
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
+            <div className="grid gap-3 md:grid-cols-2">
+              {endpoints.map((item) => (
+                <div key={item.key} className="rounded-2xl border border-borderline bg-surface px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-brand">{item.label}</p>
+                      <p className="mt-2 text-xl font-bold text-slate-800">{item.status}</p>
+                    </div>
+                    <StatusPill tone={item.tone || "info"}>{item.time}</StatusPill>
+                  </div>
+                  <p className="mt-3 text-xs leading-6 text-slate-500">{item.description}</p>
+                  <p className="mt-2 break-all text-xs text-slate-400">来源：{item.source} · {item.rawStatus}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-4">
+              {!compact ? (
+                <div className="rounded-2xl border border-borderline bg-white">
+                  {contextRows.map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between gap-4 border-b border-borderline px-4 py-3 last:border-b-0">
+                      <span className="text-sm text-slate-500">{label}</span>
+                      <span className="text-right text-sm font-semibold text-brand">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="space-y-3">
+                {(prognosis.narratives || []).slice(0, compact ? 2 : 4).map((text) => (
+                  <div key={text} className="rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-7 text-blue-800">
+                    {text}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {!compact ? (
+            <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4 text-sm leading-7 text-amber-800">
+              {prognosis.note}
+            </div>
+          ) : null}
+        </SoftCard>
+      );
+    }
+
+    function StatusPill({ tone = "slate", children }) {
+      const toneMap = {
+        info: "border border-blue-200 bg-blue-50 text-blue-700",
+        success: "border border-emerald-200 bg-emerald-50 text-emerald-700",
+        warn: "border border-amber-200 bg-amber-50 text-amber-700",
+        slate: "border border-slate-200 bg-slate-100 text-slate-700"
+      };
+
+      return (
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${toneMap[tone] || toneMap.slate}`}>
+          {children}
+        </span>
+      );
+    }
+
+    function InlineProgress({ label, value, note, colorClass = "from-brand via-medical to-cyan-400" }) {
+      return (
+        <div>
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-600">{label}</span>
+            <span className="font-semibold text-brand">{value}%</span>
+          </div>
+          <div className="h-3 rounded-full bg-slate-100">
+            <div className={`h-3 rounded-full bg-gradient-to-r transition-all duration-700 ${colorClass}`} style={{ width: `${value}%` }}></div>
+          </div>
+          {note ? <p className="mt-2 text-xs leading-6 text-slate-500">{note}</p> : null}
+        </div>
+      );
+    }
+
+    function HighlightTile({ label, value, tone = "light" }) {
+      const toneClass =
+        tone === "dark"
+          ? "bg-brand text-white"
+          : tone === "blue"
+            ? "bg-blue-50 text-blue-700"
+            : "bg-slate-100 text-slate-700";
+
+      return (
+        <div className={`rounded-2xl px-4 py-4 ${toneClass}`}>
+          <p className={`text-xs ${tone === "dark" ? "text-slate-200" : "opacity-70"}`}>{label}</p>
+          <p className="mt-2 break-all text-xl font-semibold leading-tight">{value}</p>
+        </div>
+      );
+    }
+
+    function ChartFallback({ title = "图表组件加载中" }) {
+      return (
+        <div className="flex h-full min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-borderline bg-slate-50 text-sm text-slate-500">
+          {title}
+        </div>
+      );
+    }
+
+    function ProgressRing({ value, title, subtitle, color = "#2C6E9E" }) {
+      const radius = 46;
+      const circumference = 2 * Math.PI * radius;
+      const dashoffset = circumference - value * circumference;
+
+      return (
+        <SoftCard className="p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-brand">{title}</p>
+              <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
+            </div>
+            <MockBadge />
+          </div>
+          <div className="mt-5 flex items-center justify-center">
+            <div className="relative h-36 w-36">
+              <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+                <circle cx="60" cy="60" r={radius} fill="none" stroke="#E2EDF5" strokeWidth="10"></circle>
+                <circle
+                  cx="60"
+                  cy="60"
+                  r={radius}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={dashoffset}
+                  style={{ transition: "stroke-dashoffset 0.8s ease" }}
+                ></circle>
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold text-brand">{Math.round(value * 100)}</span>
+                <span className="text-xs tracking-[0.3em] text-slate-500">SCORE</span>
+              </div>
+            </div>
+          </div>
+        </SoftCard>
+      );
+    }
+
+    function DashboardPage({
+      currentPatient = focusPatient,
+      cards = summaryCards,
+      apiStatus = "static",
+      summary = null,
+      mriSummary = null,
+      patients = [],
+      selectedPatientId = "",
+      onSelectPatient = () => {},
+      onOpenPage = () => {},
+      loading = false,
+      prediction = null
+    } = {}) {
+      const liveModalityData = summary
+        ? [
+            { name: "MRI资产", 数量: mriSummary?.mri_patient_count || 0 },
+            { name: "病理切片", 数量: summary.slide_count || 0 },
+            { name: "RNA图样本", 数量: summary.graph_count || 0 },
+            { name: "MRI完整对齐", 数量: mriSummary?.aligned_packed_patient_count || 0 }
+          ]
+        : modalityData;
+      const dashboardPathologyPreview = prediction?.pathology_preview || prediction?.pathologyPreview;
+      return (
+        <>
+          <PageHeader
+            title="工作台"
+            subtitle="围绕三阴性乳腺癌新辅助治疗场景，聚合多模态病例入库、模型推断进展与疗效追踪指标，提供可直接用于路演展示的医学风格工作台。"
+            right={
+              <>
+                <TinyInfo label="当前病例" value={currentPatient.id} />
+                <TinyInfo label="任务口径" value={currentPatient.subtype} />
+                <TinyInfo label="队列位置" value={currentPatient.cohortPosition || "待计算"} />
+                <TinyInfo label="后端状态" value={apiStatus === "connected" ? "已连接" : "静态演示"} />
+              </>
+            }
+          />
+
+          <SoftCard className="mb-6 p-5">
+            <div className="grid gap-5 lg:grid-cols-[1.1fr,1fr]">
+              <div>
+                <SectionTitle title="病例切换" desc="选择不同患者后，工作台、TNBC筛选、预测、图谱和解释性会同步刷新" />
+                <PatientSelector
+                  patients={patients}
+                  selectedPatientId={selectedPatientId || currentPatient.id}
+                  onSelectPatient={onSelectPatient}
+                  loading={loading}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <HighlightTile label="当前病例" value={currentPatient.id} tone="dark" />
+                <HighlightTile label="代理敏感性" value={`${currentPatient.sensitivity}%`} tone="blue" />
+                <HighlightTile label="队列百分位" value={currentPatient.cohortPercentile !== null && currentPatient.cohortPercentile !== undefined ? `${currentPatient.cohortPercentile}%` : "待计算"} />
+                <HighlightTile label="队列排名" value={currentPatient.cohortRank ? `第 ${currentPatient.cohortRank}/${currentPatient.cohortSize || 107}` : "待计算"} />
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ["prediction", "activity", "运行预测", "查看化疗敏感性评分"],
+                ["subtyping", "layers", "TNBC筛选", "查看 ER-/PR-/HER2- 证据"],
+                ["explain", "bar-chart-2", "解释证据", "病理热区与特征重要性"],
+                ["recommendation", "clipboard", "生成建议", "输出 MDT 展示路径"]
+              ].map(([page, icon, title, desc]) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => onOpenPage(page)}
+                  className="flex items-center gap-3 rounded-2xl border border-borderline bg-white px-4 py-4 text-left transition hover:border-medical hover:bg-blue-50/50"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-medical">
+                    <Icon name={icon} className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-brand">{title}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">{desc}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </SoftCard>
+
+          {dashboardPathologyPreview?.items?.length ? (
+            <div className="mb-6">
+              <PathologyPatchGallery
+                preview={dashboardPathologyPreview}
+                title="当前病例病理 Patch 缩略图"
+                desc="随病例切换同步刷新，展示随包携带的轻量切片图"
+              />
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {cards.map((card) => (
+              <SoftCard key={card.title} className="p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">{card.title}</p>
+                    <p className="mt-3 text-3xl font-bold text-brand">{card.value}</p>
+                  </div>
+                  <div className="rounded-2xl bg-blue-50 p-3 text-medical">
+                    <Icon name={card.icon} className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-5 flex items-center justify-between">
+                  <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700">{card.delta}</span>
+                  <span className="text-xs text-slate-400">{apiStatus === "connected" ? "后端接口" : "模拟数据"}</span>
+                </div>
+              </SoftCard>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.7fr,1fr]">
+            <SoftCard className="p-5">
+              <SectionTitle title="病例增长与建模趋势" desc="最近 6 个月病例入库、建模完成与 pCR 随访统计" />
+              {rechartsReady ? (
+                <div className="h-[340px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trendData} margin={{ top: 12, right: 16, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="4 4" stroke="#D7E6F2" />
+                      <XAxis dataKey="month" stroke="#5E7A96" />
+                      <YAxis stroke="#5E7A96" />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "18px",
+                          border: "1px solid #D3E2EE",
+                          boxShadow: "0 12px 30px rgba(30, 58, 95, 0.12)"
+                        }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="新增病例" stroke="#1E3A5F" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="建模完成" stroke="#2C6E9E" strokeWidth={3} dot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="pCR随访" stroke="#67A9D1" strokeWidth={3} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <ChartFallback title="折线图组件未加载，当前为静态演示占位" />
+              )}
+            </SoftCard>
+
+            <div className="grid gap-6">
+              <SoftCard className="p-5">
+                <SectionTitle title="模态覆盖情况" desc="主要数据模态的入库样本数量" />
+                {rechartsReady ? (
+                  <div className="h-[280px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={liveModalityData} margin={{ top: 10, right: 10, left: -18, bottom: 6 }}>
+                        <CartesianGrid strokeDasharray="4 4" stroke="#D7E6F2" />
+                        <XAxis dataKey="name" stroke="#5E7A96" tick={{ fontSize: 12 }} />
+                        <YAxis stroke="#5E7A96" />
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: "18px",
+                            border: "1px solid #D3E2EE"
+                          }}
+                        />
+                        <Bar dataKey="数量" radius={[10, 10, 0, 0]} fill="#2C6E9E" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <ChartFallback title="柱状图组件未加载，当前为静态演示占位" />
+                )}
+              </SoftCard>
+
+              <SoftCard className="p-5">
+                <SectionTitle title="今日重点监测" desc="适合在答辩中口头配合说明的系统提示" />
+                <div className="space-y-4">
+                  {dashboardAlerts.map((item) => (
+                    <div key={item.title} className="rounded-2xl border border-borderline bg-surface px-4 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-brand">{item.title}</p>
+                          <p className="mt-2 text-sm leading-7 text-slate-600">{item.desc}</p>
+                        </div>
+                        <StatusPill tone={item.tone}>{item.tag}</StatusPill>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SoftCard>
+
+              <SoftCard className="p-5">
+                <SectionTitle title="模型服务状态" desc="路演中可补充的系统在线运行指标" />
+                <div className="grid grid-cols-2 gap-4">
+                  {serviceStats.map((item) => (
+                    <div key={item.label} className={`rounded-2xl px-4 py-4 ${item.tone}`}>
+                      <p className="text-xs opacity-75">{item.label}</p>
+                      <p className="mt-2 text-2xl font-semibold">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </SoftCard>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    function MultimodalPage({ summary = null, currentPatient = focusPatient, prediction = null, mriSummary = null, mriEvidence = null } = {}) {
+      const hasBackend = !!summary;
+      const patchCount = prediction?.patch_count ?? 0;
+      const geneDim = prediction?.gene_dim ?? 0;
+      const mriPatientCount = mriSummary?.mri_patient_count ?? 0;
+      const mriSeriesCount = mriSummary?.mri_series_count ?? 0;
+      const mriDicomCount = mriSummary?.mri_dicom_count ?? 0;
+      const mriAlignedCount = mriSummary?.aligned_packed_patient_count ?? 0;
+      const mriFeatureCount = mriSummary?.feature_patient_count ?? 0;
+      const currentMriText = prediction?.has_mri_feature
+        ? `${prediction.mri_selected_series_count || prediction.mri_series_count} 个序列 / ${prediction.mri_feature_dim}维特征`
+        : prediction?.has_mri
+          ? `${prediction.mri_series_count} 个MRI序列 / 待特征化`
+          : "当前病例MRI缺失";
+      const dataCards = [
+        {
+          title: "MRI影像数据",
+          icon: "image",
+          items: hasBackend
+            ? [`D盘已索引 ${mriPatientCount} 例 TCGA-BRCA MRI`, `${mriAlignedCount} 例与TNBC病理/基因/标签完整对齐`, `${mriFeatureCount} 例已提取MRI特征并支持缺失模态融合`]
+            : ["DCE-MRI 序列完整", "病灶分割已完成", "多中心归一化通过"],
+          fill: "from-brand to-medical",
+          stat: currentMriText
+        },
+        {
+          title: "病理切片数据",
+          icon: "grid",
+          items: hasBackend
+            ? ["WSI 已切成 patch", "ResNet 2048维特征已提取", "MIL 注意力可定位高关注 patch"]
+            : ["HE 切片拼接完成", "区域级注释已关联", "肿瘤微环境评分可用"],
+          fill: "from-sky-500 to-cyan-500",
+          stat: prediction ? `${prediction.slide_count} 张切片 / ${patchCount} patch` : "418 张切片"
+        },
+        {
+          title: "基因组与临床",
+          icon: "cpu",
+          items: hasBackend
+            ? ["RNA-seq 表达矩阵已对齐", "patient 节点结构化特征已入图", "DFS/复发代理标签已绑定"]
+            : ["RNA-seq 已标准化", "TP53/BRCA 状态可追踪", "实验室指标统一结构化"],
+          fill: "from-cyan-500 to-teal-500",
+          stat: prediction ? `${geneDim} 维 RNA-seq` : "214 例组学样本"
+        }
+      ];
+      const alignmentItems = prediction
+        ? [
+            { label: "病理特征入图", value: prediction.patch_count > 0 ? 100 : 0 },
+            { label: "RNA-seq 对齐", value: prediction.gene_dim > 0 ? 100 : 0 },
+            { label: "患者节点绑定", value: prediction.graph_index >= 0 ? 100 : 0 },
+            { label: "MRI特征可用", value: prediction.has_mri_feature ? 100 : 0 },
+            { label: "多模态完整度", value: currentPatient.completeness || 0 }
+          ]
+        : [
+            { label: "影像-病理映射", value: 94 },
+            { label: "病理-组学配准", value: 88 },
+            { label: "临床字段结构化", value: 97 },
+            { label: "缺失值插补完成度", value: 81 }
+          ];
+      const graphCount = summary?.graph_count ?? summary?.patient_count ?? 0;
+      const slideCount = summary?.slide_count ?? 0;
+      const labelCounts = summary?.label_counts || {};
+      const mriCoverage = graphCount ? Math.round((mriFeatureCount / graphCount) * 100) : 0;
+      const pathologyReady = !!prediction && prediction.patch_count > 0;
+      const geneReady = !!prediction && prediction.gene_dim > 0;
+      const patientReady = !!prediction && prediction.graph_index >= 0;
+      const mriReady = !!prediction?.has_mri_feature;
+      const modalityMatrix = [
+        {
+          key: "pathology",
+          title: "病理 WSI / Patch",
+          icon: "grid",
+          status: pathologyReady,
+          statusText: pathologyReady ? "已入图" : "待接入",
+          value: prediction ? `${prediction.slide_count} 张切片` : `${slideCount || 0} 张切片`,
+          detail: prediction ? `${patchCount} 个 patch，ResNet 2048维特征` : "WSI 切块后进入 MIL 注意力池化",
+          progress: pathologyReady ? 100 : 0
+        },
+        {
+          key: "rna",
+          title: "RNA-seq 表达",
+          icon: "cpu",
+          status: geneReady,
+          statusText: geneReady ? "已对齐" : "待接入",
+          value: geneReady ? `${geneDim} 维` : "60660 维模板",
+          detail: "按 12 位 TCGA patient ID 与病理图样本对齐",
+          progress: geneReady ? 100 : 0
+        },
+        {
+          key: "mri",
+          title: "MRI 影像证据",
+          icon: "image",
+          status: mriReady,
+          statusText: mriReady ? "本例可用" : "本例缺失",
+          value: mriReady ? `${prediction.mri_feature_dim} 维特征` : `${mriFeatureCount}/${graphCount || 107} 例可用`,
+          detail: mriReady ? currentMriText : "不伪造缺失 MRI；模型自动回退到病理 + RNA-seq",
+          progress: mriReady ? 100 : mriCoverage
+        },
+        {
+          key: "patient",
+          title: "患者节点 / 标签",
+          icon: "user-check",
+          status: patientReady,
+          statusText: patientReady ? "已绑定" : "待绑定",
+          value: prediction ? `graph #${prediction.graph_index}` : `${graphCount || 0} 个图样本`,
+          detail: "DFS/复发状态作为当前 TCGA 演示的化疗敏感性代理标签",
+          progress: patientReady ? 100 : 0
+        }
+      ];
+      const fusionSteps = [
+        { title: "统一ID", desc: "TCGA 12位患者ID作为跨模态主键", icon: "link" },
+        { title: "病理编码", desc: "patch -> ResNet特征 -> MIL注意力", icon: "grid" },
+        { title: "基因编码", desc: "RNA-seq表达向量进入组学分支", icon: "cpu" },
+        { title: "MRI证据", desc: "有则接入影像表型，缺失则标记跳过", icon: "image" },
+        { title: "异构图", desc: "image_patch / gene_profile / patient 节点融合", icon: "share-2" },
+        { title: "输出", desc: "TNBC筛选、代理敏感性和解释报告", icon: "activity" }
+      ];
+      const assetTiles = [
+        { label: "打包图样本", value: `${graphCount || 107}` },
+        { label: "病理切片", value: `${slideCount || prediction?.slide_count || 0}` },
+        { label: "DFS敏感代理", value: `${labelCounts[0] ?? labelCounts["0"] ?? 92}` },
+        { label: "复发耐药代理", value: `${labelCounts[1] ?? labelCounts["1"] ?? 15}` },
+        { label: "MRI资产库", value: `${mriPatientCount || 137}` },
+        { label: "MRI三模态对齐", value: `${mriAlignedCount || 12}` }
+      ];
+
+      return (
+        <>
+          <PageHeader
+            title="多模态数据管理"
+            subtitle="把当前病例的病理 patch、RNA-seq、MRI证据和DFS代理标签放在同一张数据地图里，清楚展示哪些模态已接入、哪些缺失、以及它们如何进入异构图模型。"
+            right={
+              <>
+                <TinyInfo label="当前病例" value={currentPatient.id} />
+                <TinyInfo label="病理Patch" value={prediction ? `${patchCount}` : "待读取"} />
+                <TinyInfo label="RNA-seq" value={prediction ? `${geneDim}维` : "待读取"} />
+                <TinyInfo label="MRI状态" value={prediction?.has_mri_feature ? "已接入" : "缺失/待接入"} />
+              </>
+            }
+          />
+
+          <div className="grid gap-6 xl:grid-cols-[1fr,1.45fr]">
+            <SoftCard className="overflow-hidden bg-gradient-to-br from-brand via-medical to-cyan-500">
+              <div className="h-full px-5 py-6 text-white">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-100/80">Current Case Package</p>
+                    <h2 className="mt-3 text-2xl font-bold">{currentPatient.id}</h2>
+                    <p className="mt-2 text-sm text-slate-100/85">{currentPatient.stage} · {currentPatient.subtype}</p>
+                  </div>
+                  <StatusPill tone={prediction?.has_mri_feature ? "success" : "warn"}>
+                    {prediction?.has_mri_feature ? "三模态病例" : "双模态病例"}
+                  </StatusPill>
+                </div>
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-white/12 px-4 py-4 backdrop-blur-sm">
+                    <p className="text-xs text-slate-100/75">代理敏感性</p>
+                    <p className="mt-2 text-2xl font-bold">{currentPatient.sensitivity}%</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/12 px-4 py-4 backdrop-blur-sm">
+                    <p className="text-xs text-slate-100/75">完整度</p>
+                    <p className="mt-2 text-2xl font-bold">{currentPatient.completeness}%</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/12 px-4 py-4 backdrop-blur-sm">
+                    <p className="text-xs text-slate-100/75">标签</p>
+                    <p className="mt-2 text-base font-semibold">{prediction?.label === 1 ? "复发耐药代理" : "DFS敏感代理"}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/12 px-4 py-4 backdrop-blur-sm">
+                    <p className="text-xs text-slate-100/75">模型</p>
+                    <p className="mt-2 break-all text-sm font-semibold">{currentPatient.modelVersion || summary?.model_version || "待读取"}</p>
+                  </div>
+                </div>
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="模态接入矩阵" desc="选择不同病例后，这里会同步显示该病例每个模态的真实接入状态" />
+              <div className="grid gap-4 md:grid-cols-2">
+                {modalityMatrix.map((item) => (
+                  <div key={item.key} className="rounded-2xl border border-borderline bg-white px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-medical">
+                          <Icon name={item.icon} className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-brand">{item.title}</p>
+                          <p className="mt-1 text-xs text-slate-500">{item.value}</p>
+                        </div>
+                      </div>
+                      <StatusPill tone={item.status ? "success" : item.key === "mri" ? "warn" : "slate"}>
+                        {item.statusText}
+                      </StatusPill>
+                    </div>
+                    <div className="mt-4">
+                      <InlineProgress label="接入度" value={item.progress} note={item.detail} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+          </div>
+
+          <SoftCard className="mt-6 p-5">
+            <SectionTitle title="异构图融合流水线" desc="从原始多模态数据到模型输出的完整路径，一页讲清楚系统背后的算法水管" />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              {fusionSteps.map((step, index) => (
+                <div key={step.title} className="relative rounded-2xl border border-borderline bg-surface px-4 py-4">
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-medical shadow-panel">
+                      <Icon name={step.icon} className="h-5 w-5" />
+                    </span>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
+                      {index + 1}
+                    </span>
+                  </div>
+                  <p className="mt-4 text-sm font-semibold text-brand">{step.title}</p>
+                  <p className="mt-2 text-xs leading-6 text-slate-500">{step.desc}</p>
+                </div>
+              ))}
+            </div>
+          </SoftCard>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+            {assetTiles.map((item, index) => (
+              <HighlightTile key={item.label} label={item.label} value={item.value} tone={index === 0 ? "dark" : index % 2 ? "blue" : "light"} />
+            ))}
+          </div>
+
+          <div className="mt-6">
+            <SectionTitle title="三类数据源明细" desc="每个模态不仅展示数量，也说明它在模型中的作用" />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {dataCards.map((card) => (
+              <SoftCard key={card.title} className="overflow-hidden">
+                <div className={`h-36 bg-gradient-to-br ${card.fill} p-5 text-white`}>
+                  <div className="flex items-start justify-between">
+                    <div className="rounded-2xl bg-white/15 p-3 backdrop-blur-sm">
+                      <Icon name={card.icon} className="h-6 w-6" />
+                    </div>
+                    <MockBadge />
+                  </div>
+                  <p className="mt-5 text-xl font-semibold">{card.title}</p>
+                  <p className="mt-2 text-sm text-white/85">{card.stat}</p>
+                </div>
+                <div className="p-5">
+                  <div className="space-y-3">
+                    {card.items.map((item) => (
+                      <div key={item} className="flex items-center gap-3 rounded-2xl border border-borderline bg-surface px-4 py-3">
+                        <span className="h-2.5 w-2.5 rounded-full bg-medical"></span>
+                        <span className="text-sm text-slate-600">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </SoftCard>
+            ))}
+          </div>
+
+          {mriSummary ? (
+            <div className="mt-6">
+              <SoftCard className="p-5">
+                <SectionTitle title="MRI资产盘点" desc="D盘 TCGA-BRCA MRI 与当前 TNBC 多模态队列的交集状态" />
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <HighlightTile label="MRI患者资产" value={`${mriPatientCount}例`} tone="dark" />
+                  <HighlightTile label="MRI序列" value={`${mriSeriesCount}`} tone="blue" />
+                  <HighlightTile label="DICOM文件" value={`${mriDicomCount}`} />
+                  <HighlightTile label="完整对齐TNBC" value={`${mriAlignedCount}例`} tone="blue" />
+                </div>
+                <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-4 text-sm leading-7 text-blue-700">
+                  MRI 当前用于三模态接入验证和后续自监督预训练，不作为主模型性能提升结论；主预测仍以107例病理+RNA-seq为主体。
+                </div>
+              </SoftCard>
+            </div>
+          ) : null}
+
+          {mriEvidence ? (
+            <div className="mt-6">
+              <MriEvidencePanel evidence={mriEvidence} />
+            </div>
+          ) : null}
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr,1fr]">
+            <SoftCard className="p-5">
+              <SectionTitle title="病例对齐进度" desc="多模态异构数据的统一编码与质控进展" />
+              <div className="space-y-5">
+                {alignmentItems.map((item) => (
+                  <div key={item.label}>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-600">{item.label}</span>
+                      <span className="font-semibold text-brand">{item.value}%</span>
+                    </div>
+                    <div className="h-3 rounded-full bg-slate-100">
+                      <div
+                        className="h-3 rounded-full bg-gradient-to-r from-brand via-medical to-cyan-400 transition-all duration-700"
+                        style={{ width: `${item.value}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+
+            <div className="grid gap-6">
+              <SoftCard className="p-5">
+                <SectionTitle title="当前样例病例" desc="来自后端异构图与模型推断的病例数据概况" />
+                <div className="space-y-4">
+                  {[
+                    ["患者编号", currentPatient.id],
+                    ["样本来源", currentPatient.age],
+                    ["数据分组", currentPatient.stage],
+                    ["当前任务", "DFS/复发状态代理"],
+                    ["模型版本", currentPatient.modelVersion || "baseline"],
+                    ["MRI状态", prediction?.has_mri_feature ? `已接入 ${prediction.mri_feature_dim}维` : prediction?.has_mri ? "有MRI但未接入特征" : "MRI缺失"],
+                    ["标签说明", summary?.label_note ? "TCGA代理标签" : "前端模拟数据"]
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between rounded-2xl border border-borderline bg-surface px-4 py-3">
+                      <span className="text-sm text-slate-500">{label}</span>
+                      <span className="text-sm font-semibold text-brand">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </SoftCard>
+
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    function NewPatientUploadPage({ summary = null } = {}) {
+      const flowSteps = [
+        { title: "准备特征包", desc: "先完成病理patch、RNA-seq和patient特征预处理。", icon: "package" },
+        { title: "上传JSON", desc: "只上传轻量模型输入特征，不上传原始WSI、MRI或测序大文件。", icon: "upload-cloud" },
+        { title: "后端推断", desc: "调用当前 attention_fusion 模型输出DFS代理敏感性和耐药风险。", icon: "activity" },
+        { title: "结果展示", desc: "结果可用于答辩演示、MDT讨论样例和后续报告生成。", icon: "file-text" }
+      ];
+      const packageFields = [
+        ["patient_id", "新患者或样例病例编号"],
+        ["image_patch_features", "病理patch特征矩阵，二维数字数组"],
+        ["gene_profile", "RNA-seq表达向量，长度需与训练模板一致"],
+        ["patient_features", "patient节点结构化特征，一维或二维数字数组"]
+      ];
+
+      return (
+        <>
+          <PageHeader
+            title="新患者上传"
+            subtitle="把新患者的预处理特征包作为独立入口接入系统。这个模块负责新病例推断，不再混在多模态数据管理页里。"
+            right={
+              <>
+                <TinyInfo label="接口" value="POST /api/predict-uploaded" />
+                <TinyInfo label="格式" value="JSON特征包" />
+                <TinyInfo label="模型" value={summary?.model_version || "attention_fusion"} />
+                <TinyInfo label="任务" value="DFS代理推断" />
+              </>
+            }
+          />
+
+          <FeaturePackageUploadCard />
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr,1fr]">
+            <SoftCard className="p-5">
+              <SectionTitle title="接入流程" desc="新病例从特征包到模型输出的四步路径" />
+              <div className="grid gap-4 md:grid-cols-2">
+                {flowSteps.map((step, index) => (
+                  <div key={step.title} className="rounded-2xl border border-borderline bg-surface px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-medical shadow-panel">
+                        <Icon name={step.icon} className="h-5 w-5" />
+                      </span>
+                      <span className="rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white">Step {index + 1}</span>
+                    </div>
+                    <p className="mt-4 text-sm font-semibold text-brand">{step.title}</p>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">{step.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="特征包字段" desc="上传文件必须包含这些模型输入字段" />
+              <div className="space-y-3">
+                {packageFields.map(([field, desc]) => (
+                  <div key={field} className="rounded-2xl border border-borderline bg-white px-4 py-3">
+                    <p className="break-all text-sm font-semibold text-brand">{field}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">{desc}</p>
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-3">
+            <SoftCard className="p-5">
+              <SectionTitle title="上传前" desc="先完成原始数据到特征的转换" />
+              <div className="space-y-3 text-sm leading-7 text-slate-600">
+                <p className="rounded-2xl bg-surface px-4 py-3">病理WSI需要先切patch并提取ResNet特征。</p>
+                <p className="rounded-2xl bg-surface px-4 py-3">RNA-seq需要按训练集同一基因顺序整理成表达向量。</p>
+                <p className="rounded-2xl bg-surface px-4 py-3">patient特征需要与当前异构图模型维度一致。</p>
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="上传后" desc="系统会直接返回推断结果" />
+              <div className="space-y-3 text-sm leading-7 text-slate-600">
+                <p className="rounded-2xl bg-surface px-4 py-3">输出DFS代理敏感概率和复发/耐药风险。</p>
+                <p className="rounded-2xl bg-surface px-4 py-3">使用同一个后端模型，不重新训练。</p>
+                <p className="rounded-2xl bg-surface px-4 py-3">若字段缺失或维度不对，会直接提示错误。</p>
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="边界说明" desc="避免把演示系统说成临床成品" />
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4 text-sm leading-7 text-amber-800">
+                当前上传入口接收的是预处理特征，不是原始医院检查文件。当前主模型仍是TCGA DFS代理任务，真实pCR化疗敏感性需要外部pCR队列继续验证。
+              </div>
+            </SoftCard>
+          </div>
+        </>
+      );
+    }
+
+    function PredictionPage({ currentPatient = focusPatient, prediction = null, subtype = null, mriEvidence = null, prognosis = null } = {}) {
+      const sensitivityValue = Math.max(0, Math.min(1, (currentPatient.sensitivity || 0) / 100));
+      const resistanceValue = prediction ? Math.max(0, Math.min(1, prediction.resistant_probability || 0)) : 0.31;
+      const proxyText = prediction?.interpretation || "当前为前端模拟结果。接入后端后将读取 TCGA DFS/复发状态代理模型输出。";
+      const attentionWeights = prediction?.modality_attention;
+      const pathologyPreview = prediction?.pathology_preview || prediction?.pathologyPreview;
+      const cohort = prediction?.cohort || {};
+      const relativeValue = Math.max(0, Math.min(1, (cohort.relative_sensitivity_index ?? currentPatient.sensitivity ?? 0) / 100));
+      const cohortPercentile = cohort.sensitivity_percentile !== undefined ? `${cohort.sensitivity_percentile}%` : "待计算";
+      const cohortRank = cohort.sensitivity_rank && cohort.size ? `第 ${cohort.sensitivity_rank}/${cohort.size}` : "待计算";
+      const tnbcCard = subtype?.cards?.find((item) => item.key === "TNBC");
+      const subtypeSignalValue = Math.max(0, Math.min(1, tnbcCard?.score ?? subtype?.confidence ?? relativeValue));
+      const contributionItems = attentionWeights
+        ? [
+            { name: "病理图像注意力", value: Math.round(attentionWeights.image * 100), note: "基于 ResNet patch 特征的 MIL 注意力聚合" },
+            { name: "基因表达注意力", value: Math.round(attentionWeights.gene * 100), note: "基于 RNA-seq 表达向量的组学分支贡献" },
+            { name: "患者特征注意力", value: Math.round(attentionWeights.patient * 100), note: "patient 级结构化特征分支贡献" }
+          ]
+        : predictionContributions;
+      const topContribution = [...contributionItems].sort((a, b) => b.value - a.value)[0] || contributionItems[0];
+      const mainSubtype = subtype?.primary || "待筛选";
+      const secondarySubtype = subtype?.secondary || "待计算";
+      const dynamicSummary = prediction
+        ? [
+            `当前病例 DFS 代理敏感概率为 ${prediction.sensitivity_score}%，在 ${cohort.size || 107} 例队列中处于${cohort.position_label || "相对位置待计算"}，敏感性排名 ${cohortRank}。`,
+            `多模态注意力最高的是${topContribution.name}，贡献约 ${topContribution.value}%；当前三阴性筛选结果为 ${mainSubtype}/${secondarySubtype}。`,
+            pathologyPreview?.mapped_attention_count
+              ? `模型已回溯 ${pathologyPreview.mapped_attention_count} 个病理高关注 patch，并展示 ${pathologyPreview.items.length} 张当前病例缩略图。`
+              : `该病例当前没有可回溯的病理缩略图，仍保留 patch row 和注意力权重作为解释入口。`
+          ]
+        : [
+            "多模态融合后，系统将结合病理、RNA-seq 和患者结构化特征输出代理敏感性。",
+            "当前为静态演示数据，接入后端后会切换为患者级动态结果。",
+            "建议在答辩演示时突出模型不仅给出概率，也给出关键驱动因素与后续路径。"
+          ];
+      const dynamicPositiveSignals = prediction
+        ? [
+            `队列内相对敏感指数为 ${cohort.relative_sensitivity_index ?? "待计算"}/100，用于放大展示窄概率区间里的个体差异。`,
+            `${topContribution.name}为当前最强证据来源，说明该病例主要由该模态推动最终判断。`,
+            `${mainSubtype} 是当前筛选结论，提示系统可把 TNBC 身份传递给后续化疗敏感性预测模块。`
+          ]
+        : positiveSignals;
+      const dynamicRiskSignals = prediction
+        ? [
+            `耐药代理概率为 ${prediction.resistance_score}%，队列耐药风险位置为 ${cohort.risk_position_label || "待计算"}。`,
+            `当前训练标签仍是 TCGA DFS/复发代理，不等同于真实新辅助 pCR 结论。`,
+            prediction.has_mri_feature
+              ? `该病例已接入 ${prediction.mri_feature_dim} 维 MRI 特征，但 MRI 目前用于三模态兼容性展示。`
+              : "该病例 MRI 缺失，系统会以病理、RNA-seq 和患者特征完成双模态推断。"
+          ]
+        : riskSignals;
+      return (
+        <>
+          <PageHeader
+            title="化疗敏感性预测"
+            subtitle="系统基于多模态深度学习融合结果输出化疗敏感性评分。当前 TCGA 演示使用 DFS/复发状态作为代理标签，真实 pCR 任务将在后续数据接入后替换。"
+            right={
+              <>
+                <TinyInfo label="主预测结果" value={currentPatient.predictionLabel || "待分析"} />
+                <TinyInfo label="DFS代理敏感概率" value={currentPatient.pcr} />
+                <TinyInfo label="队列百分位" value={cohortPercentile} />
+                <TinyInfo label="队列排名" value={cohortRank} />
+              </>
+            }
+          />
+
+          <div className="grid gap-6 xl:grid-cols-[1.3fr,1fr]">
+            <div className="grid gap-6 md:grid-cols-2">
+              <ProgressRing value={sensitivityValue} title="化疗敏感性评分" subtitle="基于 DFS 代理标签的综合判断" color="#1E3A5F" />
+              <ProgressRing value={relativeValue} title="队列相对位置" subtitle="在当前 107 例内的相对敏感指数" color="#2C6E9E" />
+              <ProgressRing value={subtypeSignalValue} title="TNBC筛选置信" subtitle="来自 ER-/PR-/HER2- 三项证据" color="#3C93C5" />
+              <ProgressRing value={resistanceValue} title="耐药风险" subtitle="复发/耐药代理方向的模型概率" color="#67A9D1" />
+            </div>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="模型解读摘要" desc="可直接用于答辩说明的简洁文本结论" />
+              <div className="grid gap-4 sm:grid-cols-3">
+                <HighlightTile label="综合结论" value={currentPatient.predictionLabel || "待分析"} tone="dark" />
+                <HighlightTile label="队列相对位置" value={cohort.position_label || "待计算"} tone="blue" />
+                <HighlightTile label="模型置信度" value={currentPatient.confidence || "演示级"} />
+              </div>
+              <div className="mt-5 space-y-4">
+                {dynamicSummary.map((text) => (
+                  <div key={text} className="rounded-2xl border border-borderline bg-surface px-4 py-4 text-sm leading-7 text-slate-600">
+                    {text}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 rounded-2xl bg-blue-50 px-4 py-4 text-sm leading-7 text-blue-700">
+                {proxyText}
+              </div>
+            </SoftCard>
+          </div>
+
+          {mriEvidence ? (
+            <div className="mt-6">
+              <MriEvidencePanel evidence={mriEvidence} compact />
+            </div>
+          ) : null}
+
+          {prognosis ? (
+            <div className="mt-6">
+              <PrognosisPanel prognosis={prognosis} />
+            </div>
+          ) : null}
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr,1fr,1fr]">
+            <SoftCard className="p-5">
+              <SectionTitle title="多模态贡献" desc="决定当前预测结果的主要来源" />
+              <div className="space-y-5">
+                {contributionItems.map((item, index) => (
+                  <InlineProgress
+                    key={item.name}
+                    label={item.name}
+                    value={item.value}
+                    note={item.note}
+                    colorClass={index % 2 === 0 ? "from-brand via-medical to-cyan-400" : "from-sky-500 via-medical to-brand"}
+                  />
+                ))}
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="促进敏感性的信号" desc="支撑高应答评分的核心依据" />
+              <div className="space-y-4">
+                {dynamicPositiveSignals.map((text) => (
+                  <div key={text} className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-700">
+                    {text}
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="潜在风险提示" desc="需结合 MDT 进一步讨论的因素" />
+              <div className="space-y-4">
+                {dynamicRiskSignals.map((text) => (
+                  <div key={text} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-7 text-amber-700">
+                    {text}
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+          </div>
+
+          {pathologyPreview?.items?.length ? (
+            <div className="mt-6">
+              <PathologyPatchGallery
+                preview={pathologyPreview}
+                title="病理 Patch 缩略图"
+                desc="模型高关注 patch 与代表性切块"
+              />
+            </div>
+          ) : prediction?.top_patch_attention ? (
+            <div className="mt-6">
+              <SoftCard className="p-5">
+                <SectionTitle title="病理 Patch 注意力" desc="后端返回了注意力 row，但当前没有可展示的 patch 图片" />
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  {prediction.top_patch_attention.slice(0, 10).map((item) => (
+                    <div key={item.patch_row} className="rounded-2xl border border-borderline bg-surface px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Patch Row</p>
+                      <p className="mt-2 text-lg font-bold text-brand">{item.patch_row}</p>
+                      <p className="mt-1 text-xs text-slate-500">attention {(item.attention * 100).toFixed(3)}%</p>
+                    </div>
+                  ))}
+                </div>
+              </SoftCard>
+            </div>
+          ) : null}
+        </>
+      );
+    }
+
+    function SubtypingPage({ subtype = null, summary = null } = {}) {
+      const cards = subtype?.cards?.length ? subtype.cards : subtypeCards;
+      const rows = subtype?.heatmapRows?.length ? subtype.heatmapRows : heatmapRows;
+      const heatmapColumns = subtype?.columns?.length ? subtype.columns : ["ER", "PR", "HER2", "TNBC"];
+      const conclusions = subtype?.conclusions?.length
+        ? subtype.conclusions
+        : [
+            "当前模块只做三阴性识别：判断 ER、PR、HER2 是否均为阴性。",
+            "ER 阴性主要看 ESR1 低表达，PR 阴性主要看 PGR 低表达。",
+            "HER2 阴性主要看 ERBB2/GRB7 轴低表达，正式结果需 IHC/FISH 复核。",
+            "筛出 TNBC 后，才进入后续化疗敏感性预测与精准治疗建议。"
+          ];
+      const colorByScore = (score) => {
+        const opacity = 0.16 + score * 0.58;
+        return `rgba(44, 110, 158, ${opacity.toFixed(2)})`;
+      };
+
+      return (
+        <>
+          <PageHeader
+            title="三阴性乳腺癌识别"
+            subtitle="本页只负责把三阴性乳腺癌筛出来：ER 阴性、PR 阴性、HER2 阴性三项同时成立后，才进入 TNBC 后续预测流程。"
+            right={
+              <>
+                <TinyInfo label="识别结果" value={subtype?.primary || "TNBC已筛出"} />
+                <TinyInfo label="复核项目" value={subtype?.secondary || "ER-/PR-/HER2-"} />
+                <TinyInfo label="筛选置信度" value={subtype?.confidence ? `${Math.round(subtype.confidence * 100)}%` : "86%"} />
+                <TinyInfo label="匹配样本库" value={summary ? `${summary.patient_count} 例` : "1,286 例"} />
+              </>
+            }
+          />
+
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            {cards.map((item) => (
+              <SoftCard key={item.key} className="overflow-hidden">
+                <div className={`bg-gradient-to-br ${item.accent} px-5 py-5 text-white`}>
+                  <div className="flex items-start justify-between">
+                    <div className="rounded-2xl bg-white/15 px-3 py-2 text-sm font-semibold backdrop-blur-sm">{item.key}</div>
+                    <MockBadge />
+                  </div>
+                  <p className="mt-5 text-xl font-semibold">{item.title}</p>
+                  <p className="mt-4 text-4xl font-bold">{Math.round(item.score * 100)}%</p>
+                </div>
+                <div className="p-5">
+                  <p className="text-sm leading-7 text-slate-600">{item.desc}</p>
+                </div>
+              </SoftCard>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr,1fr]">
+            <SoftCard className="p-5">
+              <SectionTitle title="ER/PR/HER2 阴性证据热力图" desc="展示 RNA-seq 标志物对三阴性筛选的支持强度" />
+              <div className="overflow-x-auto custom-scrollbar">
+                <div className="min-w-[640px]">
+                  <div className="grid grid-cols-[120px_repeat(4,minmax(110px,1fr))] gap-3">
+                    <div></div>
+                    {heatmapColumns.map((name) => (
+                      <div key={name} className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-brand">
+                        {name}
+                      </div>
+                    ))}
+                    {rows.map((row) => (
+                      <React.Fragment key={row.marker}>
+                        <div className="flex items-center rounded-2xl bg-surface px-4 py-3 text-sm font-medium text-slate-600">
+                          {row.marker}
+                        </div>
+                        {heatmapColumns.map((key) => (
+                          <div
+                            key={`${row.marker}-${key}`}
+                            className="heat-cell rounded-2xl px-4 py-4 text-center text-sm font-semibold text-white"
+                            style={{ background: colorByScore(row[key] || 0) }}
+                          >
+                            {Math.round((row[key] || 0) * 100)}%
+                          </div>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="三阴性识别结论" desc="当前病例是否进入 TNBC 后续预测流程" />
+              <div className="space-y-4">
+                {conclusions.map((text) => (
+                  <div key={text} className="rounded-2xl border border-borderline bg-surface px-4 py-4 text-sm leading-7 text-slate-600">
+                    {text}
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+          </div>
+        </>
+      );
+    }
+
+    function RecommendationPage({ recommendation = null } = {}) {
+      const blocks = recommendation?.blocks?.length ? recommendation.blocks : recommendationBlocks;
+      const steps = recommendation?.timeline?.length ? recommendation.timeline : timelineSteps;
+      return (
+        <>
+          <PageHeader
+            title="治疗方案推荐"
+            subtitle="先确认 ER、PR、HER2 三项阴性并筛出 TNBC，再结合化疗敏感性和多模态证据给出后续科研展示建议。"
+            right={
+              <>
+                <TinyInfo label="推荐优先级" value={recommendation?.priorityText || "化疗 > 免疫 > 靶向"} />
+                <TinyInfo label="MDT状态" value={recommendation?.mdtStatus || "待讨论"} />
+                <TinyInfo label="风险提示" value={recommendation?.riskText || "关注复发监测"} />
+                <TinyInfo label="证据等级" value={recommendation?.evidenceLevel || "A / B / 探索性"} />
+              </>
+            }
+          />
+
+          <div className="grid gap-6 xl:grid-cols-[1.25fr,1fr]">
+            <div className="space-y-6">
+              {blocks.map((block) => (
+                <SoftCard key={block.title} className="p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-brand">{block.title}</h3>
+                      <p className="mt-2 text-sm text-slate-500">{recommendation ? "基于当前病例模型输出生成的动态建议" : "基于模拟病例特征生成的演示建议"}</p>
+                    </div>
+                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${block.color}`}>{block.tag}</span>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {block.items.map((item) => (
+                      <div key={item} className="rounded-2xl border border-borderline bg-surface px-4 py-4 text-sm leading-7 text-slate-600">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </SoftCard>
+              ))}
+            </div>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="临床路径建议" desc="模拟系统输出的标准化治疗流程" />
+              <div className="space-y-4">
+                {steps.map((step, index) => (
+                  <div key={step.title} className="flex gap-4 rounded-2xl border border-borderline bg-surface px-4 py-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-brand">{step.title}</p>
+                      <p className="mt-1 text-sm leading-7 text-slate-600">{step.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+          </div>
+        </>
+      );
+    }
+
+    function GraphPage({ graph = null } = {}) {
+      const [selectedNodeId, setSelectedNodeId] = useState("patient");
+      const nodes = graph?.nodes?.length ? graph.nodes : graphNodes;
+      const edges = graph?.edges?.length ? graph.edges : graphEdges;
+      const nodeMap = useMemo(() => {
+        return nodes.reduce((acc, node) => {
+          acc[node.id] = node;
+          return acc;
+        }, {});
+      }, [nodes]);
+
+      useEffect(() => {
+        if (nodes.length && !nodeMap[selectedNodeId]) {
+          setSelectedNodeId(nodes[0].id);
+        }
+      }, [nodes, nodeMap, selectedNodeId]);
+
+      const currentNode = nodeMap[selectedNodeId] || nodes[0] || {};
+      const relatedEdges = edges.filter(([source, target]) => source === currentNode.id || target === currentNode.id);
+      const relationRows = edges
+        .map(([source, target, label]) => ({
+          source: nodeMap[source],
+          target: nodeMap[target],
+          label
+        }))
+        .filter((item) => item.source && item.target);
+      const evidenceLayer = ["patient", "pathology", "gene", "mri", "patient_feature"].map((id) => nodeMap[id]).filter(Boolean);
+      const reasoningLayer = ["subtype", "attention"].map((id) => nodeMap[id]).filter(Boolean);
+      const outputLayer = ["sensitivity", "plan"].map((id) => nodeMap[id]).filter(Boolean);
+      const graphLayers = [
+        { title: "证据输入层", desc: "病例、病理、RNA-seq、MRI和患者结构化特征", items: evidenceLayer },
+        { title: "模型推理层", desc: "TNBC筛选和多模态注意力融合", items: reasoningLayer },
+        { title: "临床输出层", desc: "DFS代理敏感性和方案路径", items: outputLayer }
+      ];
+      const pathIds = ["patient", "pathology", "gene", "mri", "patient_feature", "subtype", "attention", "sensitivity", "plan"];
+      const reasoningPath = pathIds.map((id) => nodeMap[id]).filter(Boolean);
+      const selectedIndex = reasoningPath.findIndex((node) => node.id === currentNode.id);
+
+      return (
+        <>
+          <PageHeader
+            title="知识图谱可视化"
+            subtitle="把当前病例、多模态证据、三阴性筛选、DFS代理敏感性和治疗建议放进同一张推理图谱里，展示系统如何从数据证据走到临床路径。"
+            right={
+              <>
+                <TinyInfo label="节点数" value={nodes.length} />
+                <TinyInfo label="关系数" value={edges.length} />
+                <TinyInfo label="核心推理" value={graph?.reasoning || "TNBC筛选 -> DFS代理 -> 方案"} />
+                <TinyInfo label="当前节点" value={currentNode.label || "患者"} />
+              </>
+            }
+          />
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {graphLayers.map((layer) => (
+              <SoftCard key={layer.title} className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-brand">{layer.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">{layer.desc}</p>
+                  </div>
+                  <StatusPill tone="info">{layer.items.length} 节点</StatusPill>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {layer.items.map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      onClick={() => setSelectedNodeId(node.id)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        currentNode.id === node.id
+                          ? "bg-brand text-white"
+                          : "border border-borderline bg-white text-slate-600 hover:border-medical hover:text-medical"
+                      }`}
+                    >
+                      {node.label}
+                    </button>
+                  ))}
+                </div>
+              </SoftCard>
+            ))}
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[1.6fr,1fr]">
+            <SoftCard className="p-5">
+              <SectionTitle title="当前病例推理图谱" desc="点击节点查看证据含义；灰色 MRI 节点表示该病例缺失，不会伪造参与预测" />
+              <div className="force-canvas relative h-[520px] overflow-hidden rounded-[28px] border border-borderline">
+                <svg className="absolute inset-0 h-full w-full">
+                  {edges.map(([source, target, label]) => {
+                    const from = nodeMap[source];
+                    const to = nodeMap[target];
+                    if (!from || !to) {
+                      return null;
+                    }
+                    const labelX = (from.x + to.x) / 2;
+                    const labelY = (from.y + to.y) / 2;
+                    return (
+                      <g key={`${source}-${target}`}>
+                        <line
+                          x1={`${from.x}%`}
+                          y1={`${from.y}%`}
+                          x2={`${to.x}%`}
+                          y2={`${to.y}%`}
+                          className="connection-line"
+                          style={{ opacity: currentNode.id === source || currentNode.id === target ? 0.9 : 0.38 }}
+                        ></line>
+                        <text
+                          x={`${labelX}%`}
+                          y={`${labelY}%`}
+                          fill="#456784"
+                          fontSize="11"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                        >
+                          {label}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+                {nodes.map((node) => (
+                  <button
+                    key={node.id}
+                    type="button"
+                    onClick={() => setSelectedNodeId(node.id)}
+                    className={`absolute w-32 -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-gradient-to-br ${node.color} px-4 py-4 text-center text-white shadow-soft transition duration-300 ${
+                      currentNode.id === node.id ? "node-pulse ring-4 ring-cyan-200/70" : "hover:scale-105"
+                    }`}
+                    style={{ left: `${node.x}%`, top: `${node.y}%` }}
+                  >
+                    <p className="text-sm font-semibold leading-5">{node.label}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-white/70">{node.id}</p>
+                  </button>
+                ))}
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="节点详情与一跳关系" desc="当前选中节点在病例推理链中的作用" />
+              <div className="rounded-3xl bg-medical-gradient px-5 py-5 text-white">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-100/80">Selected Node</p>
+                <h3 className="mt-3 text-2xl font-semibold">{currentNode.label}</h3>
+                <p className="mt-3 text-sm leading-7 text-slate-100/90">{currentNode.desc}</p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-white/12 px-4 py-3">
+                    <p className="text-xs text-slate-100/75">一跳关系</p>
+                    <p className="mt-1 text-lg font-bold">{relatedEdges.length}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/12 px-4 py-3">
+                    <p className="text-xs text-slate-100/75">路径位置</p>
+                    <p className="mt-1 text-lg font-bold">{selectedIndex >= 0 ? `${selectedIndex + 1}/${reasoningPath.length}` : "支路"}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 space-y-3">
+                {relatedEdges.map(([source, target, label]) => {
+                  const nextNode = nodeMap[source === currentNode.id ? target : source];
+                  if (!nextNode) {
+                    return null;
+                  }
+                  return (
+                    <button
+                      key={`${currentNode.id}-${source}-${target}`}
+                      type="button"
+                      onClick={() => setSelectedNodeId(nextNode.id)}
+                      className="flex w-full items-center justify-between rounded-2xl border border-borderline bg-surface px-4 py-4 text-left transition hover:border-medical"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-brand">{label}</p>
+                        <p className="mt-1 text-sm text-slate-500">连接节点：{nextNode.label}</p>
+                      </div>
+                      <Icon name="chevron-right" className="h-4 w-4 text-slate-400" />
+                    </button>
+                  );
+                })}
+              </div>
+            </SoftCard>
+          </div>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr,1fr]">
+            <SoftCard className="p-5">
+              <SectionTitle title="证据到决策的推理链" desc="图谱不是单纯展示关系，而是把系统输出拆成可解释的步骤" />
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+                {reasoningPath.map((node, index) => (
+                  <button
+                    key={node.id}
+                    type="button"
+                    onClick={() => setSelectedNodeId(node.id)}
+                    className={`rounded-2xl border px-4 py-4 text-left transition ${
+                      currentNode.id === node.id
+                        ? "border-medical bg-blue-50"
+                        : "border-borderline bg-surface hover:border-medical hover:bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-sm font-bold text-medical shadow-panel">
+                        {index + 1}
+                      </span>
+                      <Icon name="arrow-right" className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-brand">{node.label}</p>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{node.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="关系明细表" desc="每一条边都对应一个医学或模型推理含义" />
+              <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1 custom-scrollbar">
+                {relationRows.map((item) => (
+                  <button
+                    key={`${item.source.id}-${item.target.id}-${item.label}`}
+                    type="button"
+                    onClick={() => setSelectedNodeId(item.target.id)}
+                    className="w-full rounded-2xl border border-borderline bg-surface px-4 py-3 text-left transition hover:border-medical hover:bg-white"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-brand">{item.label}</p>
+                      <StatusPill tone={item.source.id === currentNode.id || item.target.id === currentNode.id ? "success" : "slate"}>
+                        {item.source.id === currentNode.id || item.target.id === currentNode.id ? "相关" : "关系"}
+                      </StatusPill>
+                    </div>
+                    <p className="mt-2 text-xs leading-6 text-slate-500">
+                      {item.source.label} -> {item.target.label}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </SoftCard>
+          </div>
+        </>
+      );
+    }
+
+    function ExplainabilityPage({ explain = null } = {}) {
+      const importance = explain?.featureImportance?.length ? explain.featureImportance : featureImportance;
+      const pathologyPreview = explain?.pathologyPreview || explain?.pathology_preview;
+      const importanceChartHeight = Math.max(420, importance.length * 56);
+      const importanceColors = ["#1E3A5F", "#25507C", "#2C6E9E", "#3786B7", "#4694C7", "#58A3CF", "#67A9D1", "#7CB7DA", "#89BFE0", "#9DCCE8", "#A7D4EE"];
+      const renderImportanceTick = ({ x, y, payload }) => {
+        const label = String(payload?.value || "");
+        const lines = label.match(/.{1,8}/g) || [label];
+        const firstDy = lines.length > 1 ? -(lines.length - 1) * 7 : 4;
+
+        return (
+          <g transform={`translate(${x},${y})`}>
+            <text textAnchor="end" fill="#456784" fontSize="12" fontWeight="600">
+              {lines.map((line, index) => (
+                <tspan key={`${line}-${index}`} x="0" dy={index === 0 ? firstDy : 14}>
+                  {line}
+                </tspan>
+              ))}
+            </text>
+          </g>
+        );
+      };
+      const factors = explain?.decisionFactors?.length
+        ? explain.decisionFactors
+        : [
+            { label: "正向驱动", value: "Ki-67 高表达、TILs 丰富、PD-L1 偏高", tone: "bg-blue-50 text-blue-700" },
+            { label: "中性因素", value: "BRCA1 状态待明确、ER/PR/HER2 仍需 IHC/FISH 复核", tone: "bg-slate-100 text-slate-700" },
+            { label: "负向风险", value: "局部 EMT 信号提示后期耐药可能需监测", tone: "bg-cyan-50 text-cyan-700" }
+          ];
+      const plainSummary =
+        explain?.plainSummary ||
+        "这个页面解释模型为什么给出当前预测：它会把病理、RNA-seq、患者特征和TNBC筛选证据拆开，显示哪些因素更影响本次判断。";
+      const evidenceCards = explain?.evidenceCards?.length
+        ? explain.evidenceCards
+        : [
+            { label: "模型最终判断", value: "待分析", desc: "展示当前病例的综合预测结论。", tone: "dark" },
+            { label: "主要证据来源", value: "多模态融合", desc: "显示模型最依赖的证据来源。", tone: "blue" },
+            { label: "三阴性前置判断", value: "ER/PR/HER2", desc: "先确认是否进入TNBC分析路径。", tone: "light" },
+            { label: "临床边界", value: "科研演示", desc: "模型解释用于辅助展示，不能替代临床金标准。", tone: "light" }
+          ];
+      const readingGuide = explain?.readingGuide?.length
+        ? explain.readingGuide
+        : [
+            "先看一句话结论，理解模型给出的总体判断。",
+            "再看条形图，条越长说明该因素对本次判断影响越大。",
+            "最后看正负向因素，确认哪些证据支持预测、哪些风险需要保留。"
+          ];
+      const chartNote =
+        explain?.chartNote ||
+        "条形图显示的是本次病例内的相对解释权重，解释模型为什么这样判断，不代表单个医学指标的绝对临床强度。";
+      const glossary = explain?.featureGlossary?.length
+        ? explain.featureGlossary
+        : [
+            { name: "病理Patch注意力", meaning: "模型在病理切片小图块中关注的区域。" },
+            { name: "RNA-seq表达分支", meaning: "基因表达谱提供的分子证据。" },
+            { name: "DFS敏感概率", meaning: "当前主任务的代理输出，不等同于真实pCR概率。" }
+          ];
+      return (
+        <>
+          <PageHeader
+            title="模型可解释性"
+            subtitle="通过特征重要性排序和正负向驱动因子说明，展示模型不仅能预测结果，也能回答为什么做出这一判断。"
+            right={
+              <>
+                <TinyInfo label="解释方法" value={explain?.method || "SHAP / Attention融合"} />
+                <TinyInfo label="Top特征" value={explain?.topFeature || "Ki-67"} />
+                <TinyInfo label="正向驱动" value={explain?.positiveDriver || "TILs / PD-L1"} />
+                <TinyInfo label="负向驱动" value={explain?.negativeDriver || "AR / EMT局部信号"} />
+              </>
+            }
+          />
+
+          <SoftCard className="mb-6 p-5">
+            <SectionTitle title="一句话解释" desc="把模型输出翻译成答辩和汇报时能直接说明的结论" />
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 px-5 py-4 text-sm leading-8 text-blue-800">
+              {plainSummary}
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {evidenceCards.map((item) => (
+                <div key={item.label} className="rounded-2xl border border-borderline bg-white px-4 py-4">
+                  <HighlightTile label={item.label} value={item.value} tone={item.tone} />
+                  <p className="mt-3 text-sm leading-7 text-slate-600">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {readingGuide.map((text, index) => (
+                <div key={text} className="rounded-2xl border border-borderline bg-surface px-4 py-4">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
+                    {index + 1}
+                  </span>
+                  <p className="mt-3 text-sm leading-7 text-slate-600">{text}</p>
+                </div>
+              ))}
+            </div>
+          </SoftCard>
+
+          <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
+            <SoftCard className="p-5">
+              <SectionTitle title="特征重要性条形图" desc={explain ? "来自后端注意力融合模型的动态解释结果" : "模拟展示多模态特征对预测结果的相对贡献"} />
+              <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800">
+                {chartNote}
+              </div>
+              {rechartsReady ? (
+                <div className="overflow-x-auto custom-scrollbar">
+                  <div style={{ height: `${importanceChartHeight}px`, minWidth: "720px" }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={importance} layout="vertical" margin={{ top: 16, right: 30, left: 8, bottom: 16 }}>
+                      <CartesianGrid strokeDasharray="4 4" stroke="#D7E6F2" />
+                      <XAxis
+                        type="number"
+                        stroke="#5E7A96"
+                        domain={[0, 1]}
+                        tickFormatter={(value) => `${Math.round(value * 100)}%`}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        stroke="#5E7A96"
+                        width={150}
+                        tickLine={false}
+                        axisLine={false}
+                        interval={0}
+                        tickMargin={8}
+                        tick={renderImportanceTick}
+                      />
+                      <Tooltip
+                        formatter={(value) => [`${Math.round(value * 100)}%`, "贡献度"]}
+                        contentStyle={{
+                          borderRadius: "18px",
+                          border: "1px solid #D3E2EE"
+                        }}
+                      />
+                      <Bar dataKey="value" radius={[0, 10, 10, 0]}>
+                        {importance.map((entry, index) => (
+                          <Cell
+                            key={`${entry.name}-${index}`}
+                            fill={importanceColors[index % importanceColors.length]}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <ChartFallback title="特征重要性图表组件未加载，当前为静态演示占位" />
+              )}
+            </SoftCard>
+
+            <SoftCard className="p-5">
+              <SectionTitle title="决策因子解读" desc="正向与负向驱动因素拆解" />
+              <div className="space-y-4">
+                {factors.map((item) => (
+                  <div key={item.label} className="rounded-2xl border border-borderline bg-surface px-4 py-4">
+                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.tone}`}>{item.label}</span>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+          </div>
+
+          <div className="mt-6">
+            <SoftCard className="p-5">
+              <SectionTitle title="指标是什么意思" desc="把条形图里的模型词汇翻译成临床汇报能听懂的话" />
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {glossary.slice(0, 9).map((item) => (
+                  <div key={item.name} className="rounded-2xl border border-borderline bg-surface px-4 py-4">
+                    <p className="text-sm font-semibold text-brand">{item.name}</p>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">{item.meaning}</p>
+                  </div>
+                ))}
+              </div>
+            </SoftCard>
+          </div>
+
+          {pathologyPreview?.items?.length ? (
+            <div className="mt-6">
+              <PathologyPatchGallery
+                preview={pathologyPreview}
+                title="病理热区缩略图"
+                desc="Top patch attention 已回溯到真实病理切块"
+              />
+            </div>
+          ) : explain?.topPatchAttention?.length ? (
+            <div className="mt-6">
+              <SoftCard className="p-5">
+                <SectionTitle title="病理热区注意力" desc="后端模型返回的 Top patch attention，可作为切片热区回溯入口" />
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  {explain.topPatchAttention.slice(0, 10).map((item) => (
+                    <div key={item.patch_row} className="rounded-2xl border border-borderline bg-surface px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Patch Row</p>
+                      <p className="mt-2 text-lg font-bold text-brand">{item.patch_row}</p>
+                      <p className="mt-1 text-xs text-slate-500">attention {(item.attention * 100).toFixed(3)}%</p>
+                    </div>
+                  ))}
+                </div>
+              </SoftCard>
+            </div>
+          ) : null}
+        </>
+      );
+    }
+
+    function HistoryPage({ cases = historyCases, summary = null } = {}) {
+      return (
+        <>
+          <PageHeader
+            title="历史病例与报告"
+            subtitle="通过历史病例表格与报告导出入口，展示系统在病例回溯、结果复盘和科研积累中的可用性。"
+            right={
+              <>
+                <TinyInfo label="历史病例数" value={summary ? `${summary.patient_count}` : "384"} />
+                <TinyInfo label="报告模板" value="3 类" />
+                <TinyInfo label="归档完成率" value="91.2%" />
+                <TinyInfo label="导出格式" value="HTML报告" />
+              </>
+            }
+          />
+
+          <SoftCard className="overflow-hidden">
+            <div className="border-b border-borderline px-5 py-5">
+              <SectionTitle title="病例档案表" desc="点击下载会调用后端生成当前病例分析报告" />
+            </div>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="min-w-full divide-y divide-borderline text-left">
+                <thead className="bg-slate-50">
+                  <tr>
+                    {["病例编号", "患者", "分组", "任务", "敏感性", "标签口径", "日期", "状态", "操作"].map((head) => (
+                      <th key={head} className="px-5 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {head}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-borderline bg-white">
+                  {cases.map((item) => (
+                    <tr key={item.id} className="transition hover:bg-blue-50/40">
+                      <td className="px-5 py-4 text-sm font-semibold text-brand">{item.id}</td>
+                      <td className="px-5 py-4 text-sm text-slate-600">{item.patient}</td>
+                      <td className="px-5 py-4 text-sm text-slate-600">{item.subtype}</td>
+                      <td className="px-5 py-4 text-sm text-slate-600">{item.regimen}</td>
+                      <td className="px-5 py-4">
+                        <StatusPill tone={item.sensitivity === "高" ? "success" : item.sensitivity === "中低" ? "warn" : "info"}>
+                          {item.sensitivity}
+                        </StatusPill>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-slate-600">{item.pcr}</td>
+                      <td className="px-5 py-4 text-sm text-slate-600">{item.date}</td>
+                      <td className="px-5 py-4">
+                        <StatusPill tone={item.status.includes("待") ? "warn" : "slate"}>{item.status}</StatusPill>
+                      </td>
+                      <td className="px-5 py-4">
+                        <a
+                          href={`/api/report/${encodeURIComponent(item.id)}`}
+                          download={`${item.id}_TNBC_analysis_report.html`}
+                          className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-medical"
+                          title={item.report}
+                        >
+                          <Icon name="download" className="h-4 w-4" />
+                          下载
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SoftCard>
+        </>
+      );
+    }
+
+    function SettingsPage({
+      summary = null,
+      apiStatus = "static",
+      currentPatient = focusPatient,
+      mriSummary = null,
+      patients = [],
+      prediction = null
+    } = {}) {
+      const defaultConfig = useMemo(() => ({
+        threshold: 0.55,
+        subtypeConfidence: 0.70,
+        treatmentThreshold: 0.55,
+        autoSync: true,
+        explainMode: true,
+        knowledgeGraph: true,
+        autoReport: true
+      }), []);
+      const [config, setConfig] = useState(() => {
+        try {
+          const stored = window.localStorage.getItem("tnbcSystemSettings");
+          return stored ? { ...defaultConfig, ...JSON.parse(stored) } : defaultConfig;
+        } catch (error) {
+          return defaultConfig;
+        }
+      });
+      const [savedAt, setSavedAt] = useState(() => {
+        try {
+          return window.localStorage.getItem("tnbcSystemSettingsSavedAt") || "尚未保存";
+        } catch (error) {
+          return "尚未保存";
+        }
+      });
+      const [health, setHealth] = useState(null);
+      const [uploadSpec, setUploadSpec] = useState(null);
+
+      useEffect(() => {
+        let cancelled = false;
+        fetchJSON("/api/health")
+          .then((data) => {
+            if (!cancelled) setHealth(data);
+          })
+          .catch(() => {
+            if (!cancelled) setHealth(null);
+          });
+        fetchJSON("/api/upload-spec")
+          .then((data) => {
+            if (!cancelled) setUploadSpec(data);
+          })
+          .catch(() => {
+            if (!cancelled) setUploadSpec(null);
+          });
+        return () => {
+          cancelled = true;
+        };
+      }, []);
+
+      const backendModelVersion = summary?.model_version || prediction?.model_version || health?.model_run || "后端未连接";
+      const backendArchitecture = summary?.architecture || prediction?.architecture || "待加载";
+      const labelCounts = summary?.label_counts || {};
+      const splitCounts = summary?.split_counts || {};
+      const serverStatusLabel = apiStatus === "connected" ? "后端已连接" : apiStatus === "loading" ? "正在连接" : "接口异常";
+      const serverStatusTone = apiStatus === "connected" ? "success" : apiStatus === "loading" ? "warn" : "slate";
+      const modelReady = health?.model === true || Boolean(summary?.model_version);
+      const datasetReady = health?.dataset === true || Boolean(summary?.graph_count);
+
+      const saveConfig = () => {
+        const stamp = new Date().toLocaleString("zh-CN", { hour12: false });
+        try {
+          window.localStorage.setItem("tnbcSystemSettings", JSON.stringify(config));
+          window.localStorage.setItem("tnbcSystemSettingsSavedAt", stamp);
+        } catch (error) {
+          // localStorage may be unavailable in restricted browsers; UI still updates.
+        }
+        setSavedAt(stamp);
+      };
+
+      const resetConfig = () => {
+        try {
+          window.localStorage.removeItem("tnbcSystemSettings");
+          window.localStorage.setItem("tnbcSystemSettingsSavedAt", "已恢复默认");
+        } catch (error) {
+          // Keep the reset usable even when storage is blocked.
+        }
+        setConfig(defaultConfig);
+        setSavedAt("已恢复默认");
+      };
+
+      const toggleField = (field) => {
+        setConfig((prev) => ({ ...prev, [field]: !prev[field] }));
+      };
+
+      const runtimeRows = [
+        ["API服务", serverStatusLabel, serverStatusTone],
+        ["前端文件", health?.frontend ? "已加载" : "等待检测", health?.frontend ? "success" : "warn"],
+        ["图数据集", datasetReady ? "已加载" : "等待检测", datasetReady ? "success" : "warn"],
+        ["模型权重", modelReady ? "已加载" : "等待检测", modelReady ? "success" : "warn"],
+        ["当前病例", currentPatient.id || summary?.default_patient_id || "待选择", "info"]
+      ];
+
+      const cohortRows = [
+        ["图样本", `${summary?.graph_count || health?.patient_count || patients.length || 0} 例`],
+        ["病理切片", `${summary?.slide_count || 0} 张`],
+        ["DFS敏感代理 label 0", `${labelCounts["0"] || 0} 例`],
+        ["复发耐药代理 label 1", `${labelCounts["1"] || 0} 例`],
+        ["训练 / 验证 / 测试", `${splitCounts.train || 0} / ${splitCounts.val || 0} / ${splitCounts.test || 0}`],
+        ["MRI资产 / 对齐 / 特征", `${mriSummary?.mri_patient_count || summary?.mri_patient_count || 0} / ${mriSummary?.aligned_packed_patient_count || summary?.mri_aligned_patient_count || 0} / ${mriSummary?.feature_patient_count || summary?.mri_feature_patient_count || 0}`]
+      ];
+
+      const uploadRows = uploadSpec?.required_fields
+        ? [
+            ["接口", `${uploadSpec.method || "POST"} ${uploadSpec.endpoint || "/api/predict-uploaded"}`],
+            ["病理patch特征", uploadSpec.required_fields.image_patch_features],
+            ["RNA-seq特征", uploadSpec.required_fields.gene_profile],
+            ["患者结构化特征", uploadSpec.required_fields.patient_features]
+          ]
+        : [["接口状态", "等待后端返回上传规范"]];
+
+      return (
+        <>
+          <PageHeader
+            title="系统设置"
+            subtitle="连接当前后端模型、数据资产与本地报告配置；页面信息直接来自系统接口和浏览器持久化设置。"
+            right={
+              <>
+                <TinyInfo label="后端状态" value={serverStatusLabel} />
+                <TinyInfo label="主模型" value={backendArchitecture} />
+                <TinyInfo label="运行目录" value={backendModelVersion} />
+                <TinyInfo label="最近保存" value={savedAt} />
+              </>
+            }
+          />
+
+          <div className="grid gap-6 xl:grid-cols-[1.35fr,1fr]">
+            <div className="grid gap-6">
+              <SoftCard className="p-5">
+                <SectionTitle title="后端运行状态" desc="来自 /api/summary、/api/health 与当前病例联动数据" />
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <HighlightTile label="当前模型" value={backendModelVersion} tone="dark" />
+                  <HighlightTile label="网络结构" value={backendArchitecture} tone="blue" />
+                  <HighlightTile label="队列样本" value={`${summary?.patient_count || health?.patient_count || patients.length || 0}例`} />
+                  <HighlightTile label="当前病例" value={currentPatient.id || "待选择"} />
+                </div>
+
+                <div className="mt-5 overflow-hidden rounded-2xl border border-borderline bg-white">
+                  {runtimeRows.map(([label, value, tone]) => (
+                    <div key={label} className="flex flex-wrap items-center justify-between gap-3 border-b border-borderline px-4 py-3 last:border-b-0">
+                      <span className="text-sm font-medium text-slate-600">{label}</span>
+                      <StatusPill tone={tone}>{value}</StatusPill>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-borderline bg-surface px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">MODEL CHECKPOINT</p>
+                    <p className="mt-2 break-all text-sm font-semibold text-brand">runs/{backendModelVersion}/model.pt</p>
+                  </div>
+                  <div className="rounded-2xl border border-borderline bg-surface px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">PACKED DATASET</p>
+                    <p className="mt-2 break-all text-sm font-semibold text-brand">tnbc_multimodal_dataset.pt</p>
+                  </div>
+                </div>
+              </SoftCard>
+
+              <SoftCard className="p-5">
+                <SectionTitle title="报告阈值配置" desc="阈值用于前端分层、报告显示和筛选提示；真实推理概率仍来自后端模型输出" />
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm leading-7 text-blue-800">
+                  当前模型权重不在浏览器里热切换；如果要换模型，需要后端重新加载对应 run 目录。这里保存的是系统展示口径与报告偏好。
+                </div>
+
+                <div className="mt-6 space-y-6">
+                  {[
+                    ["threshold", "化疗敏感性分层阈值", "敏感概率达到该阈值后，报告中进入高敏感提示。"],
+                    ["subtypeConfidence", "TNBC筛选置信度阈值", "ER-/PR-/HER2- 证据达到该阈值后，前端标记为三阴性已筛出。"],
+                    ["treatmentThreshold", "方案推荐触发阈值", "综合敏感性或耐药风险达到阈值后，治疗建议卡片给出重点提示。"]
+                  ].map(([key, label, note]) => (
+                    <div key={key}>
+                      <div className="mb-2 flex items-center justify-between gap-4">
+                        <span className="text-sm font-medium text-slate-600">{label}</span>
+                        <span className="text-sm font-semibold text-brand">{config[key].toFixed(2)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.50"
+                        max="0.95"
+                        step="0.01"
+                        value={config[key]}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+                        className="w-full accent-medical"
+                      />
+                      <p className="mt-2 text-xs leading-6 text-slate-500">{note}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <button
+                    onClick={saveConfig}
+                    className="rounded-full bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-medical"
+                  >
+                    保存配置
+                  </button>
+                  <button
+                    onClick={resetConfig}
+                    className="rounded-full border border-borderline bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-medical hover:text-medical"
+                  >
+                    恢复默认
+                  </button>
+                </div>
+              </SoftCard>
+            </div>
+
+            <div className="grid gap-6">
+              <SoftCard className="p-5">
+                <SectionTitle title="真实数据资产" desc="当前系统已经读取到的队列规模与MRI接入状态" />
+                <div className="space-y-3">
+                  {cohortRows.map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between gap-4 rounded-2xl border border-borderline bg-surface px-4 py-3">
+                      <span className="text-sm text-slate-500">{label}</span>
+                      <span className="text-right text-sm font-semibold text-brand">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </SoftCard>
+
+              <SoftCard className="p-5">
+                <SectionTitle title="本地偏好" desc="保存到本机浏览器，用于记录报告和展示偏好" />
+                <div className="space-y-4">
+                  {[
+                    ["autoSync", "病例切换后同步页面数据"],
+                    ["explainMode", "报告优先展示可解释性结果"],
+                    ["knowledgeGraph", "报告优先展示知识图谱关系"],
+                    ["autoReport", "病例页报告下载入口偏好"]
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => toggleField(key)}
+                      className="flex w-full items-center justify-between gap-4 rounded-2xl border border-borderline bg-surface px-4 py-4 text-left transition hover:border-medical"
+                    >
+                      <span className="text-sm font-medium text-slate-600">{label}</span>
+                      <span className={`inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${config[key] ? "bg-blue-50 text-blue-700" : "bg-slate-200 text-slate-600"}`}>
+                        {config[key] ? "已开启" : "已关闭"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </SoftCard>
+
+              <SoftCard className="p-5">
+                <SectionTitle title="新患者接口规范" desc="后端真实提供的上传入口，不接收未经预处理的原始文件" />
+                <div className="space-y-3">
+                  {uploadRows.map(([label, value]) => (
+                    <div key={label} className="rounded-2xl border border-borderline bg-white px-4 py-3">
+                      <p className="text-xs font-semibold text-slate-400">{label}</p>
+                      <p className="mt-1 break-all text-sm leading-6 text-brand">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                {uploadSpec?.note ? (
+                  <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800">
+                    {uploadSpec.note}
+                  </div>
+                ) : null}
+              </SoftCard>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    function App() {
+      const initialPage = (() => {
+        const page = new URLSearchParams(window.location.search).get("page");
+        return navItems.some((item) => item.id === page) ? page : "dashboard";
+      })();
+      const [activePage, setActivePage] = useState(initialPage);
+      const [menuOpen, setMenuOpen] = useState(false);
+      const [now, setNow] = useState(new Date());
+      const [liveData, setLiveData] = useState({
+        apiStatus: "loading",
+        focusPatient,
+        summaryCards,
+        historyCases,
+        summary: null,
+        prediction: null,
+        patients: [],
+        selectedPatientId: "",
+        mriSummary: null,
+        subtype: null,
+        recommendation: null,
+        knowledgeGraph: null,
+        explain: null,
+        mriEvidence: null,
+        prognosis: null,
+        outcomeSummary: null,
+        isLoadingCase: false
+      });
+
+      useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 60000);
+        return () => clearInterval(timer);
+      }, []);
+
+      useEffect(() => {
+        const url = new URL(window.location.href);
+        if (activePage === "dashboard") {
+          url.searchParams.delete("page");
+        } else {
+          url.searchParams.set("page", activePage);
+        }
+        window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      }, [activePage]);
+
+      useEffect(() => {
+        let cancelled = false;
+        fetchJSON("/api/ui")
+          .then((data) => {
+            if (!cancelled) {
+              setLiveData({
+                apiStatus: data.apiStatus || "connected",
+                focusPatient: data.focusPatient || focusPatient,
+                summaryCards: data.summaryCards || summaryCards,
+                historyCases: data.historyCases || historyCases,
+                summary: data.summary || null,
+                prediction: data.prediction || null,
+                patients: data.patients || [],
+                selectedPatientId: data.focusPatient?.id || data.summary?.default_patient_id || "",
+                mriSummary: data.mriSummary || null,
+                subtype: data.subtype || null,
+                recommendation: data.recommendation || null,
+                knowledgeGraph: data.knowledgeGraph || null,
+                explain: data.explain || null,
+                mriEvidence: data.mriEvidence || null,
+                prognosis: data.prognosis || null,
+                outcomeSummary: data.outcomeSummary || data.summary?.outcome_summary || null,
+                isLoadingCase: false
+              });
+            }
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setLiveData((prev) => ({ ...prev, apiStatus: "static" }));
+            }
+          });
+        return () => {
+          cancelled = true;
+        };
+      }, []);
+
+      const loadPatient = async (patientId) => {
+        if (!patientId || patientId === liveData.selectedPatientId) {
+          return;
+        }
+        setLiveData((prev) => ({ ...prev, selectedPatientId: patientId, isLoadingCase: true }));
+        try {
+          const data = await fetchJSON(`/api/case/${encodeURIComponent(patientId)}`);
+          setLiveData((prev) => ({
+            ...prev,
+            apiStatus: "connected",
+            selectedPatientId: patientId,
+            focusPatient: data.focusPatient || prev.focusPatient,
+            prediction: data.prediction || prev.prediction,
+            subtype: data.subtype || prev.subtype,
+            recommendation: data.recommendation || prev.recommendation,
+            knowledgeGraph: data.knowledgeGraph || prev.knowledgeGraph,
+            explain: data.explain || prev.explain,
+            mriEvidence: data.mriEvidence || prev.mriEvidence,
+            prognosis: data.prognosis || prev.prognosis,
+            isLoadingCase: false
+          }));
+        } catch (error) {
+          setLiveData((prev) => ({ ...prev, apiStatus: "error", isLoadingCase: false }));
+        }
+      };
+
+      useEffect(() => {
+        if (window.feather && typeof window.feather.replace === "function") {
+          window.feather.replace();
+        }
+      }, [activePage, menuOpen, now, liveData.selectedPatientId, liveData.isLoadingCase]);
+
+      const activeNav = navItems.find((item) => item.id === activePage);
+      const liveFocusPatient = liveData.focusPatient || focusPatient;
+      const liveSummaryCards = liveData.summaryCards || summaryCards;
+      const liveHistoryCases = liveData.historyCases || historyCases;
+      const livePatients = liveData.patients || [];
+
+      const renderPage = () => {
+        switch (activePage) {
+          case "dashboard":
+            return (
+              <DashboardPage
+                currentPatient={liveFocusPatient}
+                cards={liveSummaryCards}
+                apiStatus={liveData.apiStatus}
+                summary={liveData.summary}
+                mriSummary={liveData.mriSummary}
+                patients={livePatients}
+                selectedPatientId={liveData.selectedPatientId}
+                onSelectPatient={loadPatient}
+                onOpenPage={setActivePage}
+                loading={liveData.isLoadingCase}
+                prediction={liveData.prediction}
+              />
+            );
+          case "multimodal":
+            return <MultimodalPage summary={liveData.summary} currentPatient={liveFocusPatient} prediction={liveData.prediction} mriSummary={liveData.mriSummary} mriEvidence={liveData.mriEvidence} />;
+          case "upload":
+            return <NewPatientUploadPage summary={liveData.summary} />;
+          case "prediction":
+            return <PredictionPage currentPatient={liveFocusPatient} prediction={liveData.prediction} subtype={liveData.subtype} mriEvidence={liveData.mriEvidence} prognosis={liveData.prognosis} />;
+          case "subtyping":
+            return <SubtypingPage subtype={liveData.subtype} summary={liveData.summary} />;
+          case "recommendation":
+            return <RecommendationPage recommendation={liveData.recommendation} />;
+          case "graph":
+            return <GraphPage graph={liveData.knowledgeGraph} />;
+          case "explain":
+            return <ExplainabilityPage explain={liveData.explain} />;
+          case "history":
+            return <HistoryPage cases={liveHistoryCases} summary={liveData.summary} />;
+          case "settings":
+            return <SettingsPage summary={liveData.summary} apiStatus={liveData.apiStatus} currentPatient={liveFocusPatient} mriSummary={liveData.mriSummary} patients={livePatients} prediction={liveData.prediction} />;
+          default:
+            return <DashboardPage />;
+        }
+      };
+
+      return (
+        <div className="relative min-h-screen overflow-hidden">
+          <div className="hero-grid pointer-events-none absolute inset-0 opacity-60"></div>
+
+          {menuOpen && (
+            <button
+              className="fixed inset-0 z-30 bg-slate-900/35 lg:hidden"
+              onClick={() => setMenuOpen(false)}
+              aria-label="关闭侧边栏"
+            ></button>
+          )}
+
+          <div className="relative flex min-h-screen">
+            <aside
+              className={`fixed inset-y-0 left-0 z-40 w-[290px] transform overflow-y-auto border-r border-white/50 bg-brand px-5 py-6 text-white shadow-soft transition duration-300 custom-scrollbar lg:translate-x-0 ${
+                menuOpen ? "translate-x-0" : "-translate-x-full"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-3 rounded-2xl bg-white/10 px-4 py-3">
+                    <div className="rounded-2xl bg-white/15 p-2">
+                      <Icon name="shield" className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold tracking-[0.16em] text-slate-200">TNBC AI SYSTEM</p>
+                      <p className="mt-1 text-lg font-bold">智破三阴</p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  className="rounded-xl p-2 text-white/80 transition hover:bg-white/10 lg:hidden"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <Icon name="x" className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-6 rounded-3xl border border-white/10 bg-white/8 p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-300">演示概览</p>
+                <p className="mt-3 text-sm leading-7 text-slate-100/90">
+                  基于多模态异构与深度学习的三阴性乳腺癌筛选、化疗敏感性预测与可解释分析系统。
+                </p>
+              </div>
+
+              <div className="mt-4 rounded-3xl border border-white/10 bg-white/8 p-4 backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.22em] text-slate-300">病例焦点</p>
+                    <p className="mt-3 text-sm font-semibold text-white">{liveFocusPatient.id}</p>
+                    <p className="mt-1 text-xs text-slate-300">{liveFocusPatient.age} | {liveFocusPatient.stage}</p>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200">
+                    在线分析
+                  </span>
+                </div>
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-xs text-slate-200">
+                      <span>多模态完整度</span>
+                      <span>{liveFocusPatient.completeness}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10">
+                      <div className="h-2 rounded-full bg-gradient-to-r from-cyan-300 to-sky-400" style={{ width: `${liveFocusPatient.completeness}%` }}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-xs text-slate-200">
+                      <span>化疗敏感性</span>
+                      <span>{liveFocusPatient.sensitivity}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10">
+                      <div className="h-2 rounded-full bg-gradient-to-r from-sky-300 to-blue-400" style={{ width: `${liveFocusPatient.sensitivity}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <nav className="mt-6 space-y-2">
+                {navItems.map((item, index) => {
+                  const active = item.id === activePage;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActivePage(item.id);
+                        setMenuOpen(false);
+                      }}
+                      className={`group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition duration-300 ${
+                        active
+                          ? "bg-white text-brand shadow-panel"
+                          : "text-slate-200 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <div className={`rounded-xl p-2 transition ${active ? "bg-blue-50 text-medical" : "bg-white/10 text-slate-200 group-hover:bg-white/15"}`}>
+                        <Icon name={item.icon} className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{item.label}</p>
+                        <p className={`text-xs ${active ? "text-slate-500" : "text-slate-300/80"}`}>模块 {index + 1}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <div className="mt-6 rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-slate-300">系统状态</p>
+                <div className="mt-4 space-y-3">
+                  {[
+                    ["模型在线", liveData.apiStatus === "connected" ? "正常" : "检查中"],
+                    ["病例同步", liveData.isLoadingCase ? "刷新中" : "实时"],
+                    ["数据来源", liveData.apiStatus === "connected" ? "后端接口" : "静态兜底"]
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between text-sm">
+                      <span className="text-slate-200/80">{label}</span>
+                      <span className="font-semibold text-white">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </aside>
+
+            <div className="flex min-h-screen flex-1 flex-col lg:ml-[290px]">
+              <header className="sticky top-0 z-20 border-b border-white/60 bg-white/75 backdrop-blur-xl">
+                <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+                  <div className="flex items-center gap-3">
+                    <button
+                      className="rounded-2xl border border-borderline bg-white p-3 text-brand transition hover:border-medical hover:text-medical lg:hidden"
+                      onClick={() => setMenuOpen(true)}
+                      aria-label="打开侧边栏"
+                    >
+                      <Icon name="menu" className="h-5 w-5" />
+                    </button>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.24em] text-slate-400">智破三阴 | TNBC智能诊疗系统</p>
+                      <h2 className="mt-1 text-xl font-bold text-brand">{activeNav ? activeNav.label : "工作台"}</h2>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <PatientSelector
+                      patients={livePatients}
+                      selectedPatientId={liveData.selectedPatientId || liveFocusPatient.id}
+                      onSelectPatient={loadPatient}
+                      loading={liveData.isLoadingCase}
+                    />
+                    <div className="hidden rounded-2xl border border-borderline bg-white px-4 py-3 sm:block">
+                      <p className="text-xs text-slate-400">当前时间</p>
+                      <p className="mt-1 text-sm font-semibold text-brand">
+                        {now.toLocaleDateString("zh-CN")} {now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-borderline bg-white px-4 py-3">
+                      <p className="text-xs text-slate-400">当前场景</p>
+                      <p className="mt-1 text-sm font-semibold text-brand">{liveData.isLoadingCase ? "病例刷新中" : "模型联动模式"}</p>
+                    </div>
+                  </div>
+                </div>
+              </header>
+
+              <main className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
+                {activePage !== "dashboard" ? (
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setActivePage("dashboard")}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-borderline bg-white px-4 py-3 text-sm font-semibold text-brand shadow-panel transition hover:border-medical hover:bg-blue-50 hover:text-medical"
+                    >
+                      <Icon name="arrow-left" className="h-4 w-4" />
+                      返回工作台
+                    </button>
+                  </div>
+                ) : null}
+                <div key={activePage} className="page-enter">
+                  {renderPage()}
+                </div>
+              </main>
+
+              <footer className="border-t border-white/60 bg-white/75 px-4 py-4 text-center text-sm text-slate-500 backdrop-blur-xl sm:px-6 lg:px-8">
+                扬州大学信息与人工智能学院 | 数据来源：TCGA/GDC/复旦FUDAN-TNBC
+              </footer>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
