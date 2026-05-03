@@ -1084,6 +1084,45 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
+    def do_HEAD(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/health":
+            data = json.dumps(
+                {
+                    "ok": True,
+                    "time": time.time(),
+                    "frontend": True,
+                    "dataset": True,
+                    "model": False,
+                    "model_run": "public_api_proxy_v1",
+                    "patient_count": len(_legacy_patients(limit=200)),
+                    "mode": "system1_compatible_online",
+                },
+                ensure_ascii=False,
+                indent=2,
+            ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            return
+
+        file_path = FRONTEND / "index.html" if parsed.path in {"", "/"} else (FRONTEND / parsed.path.lstrip("/")).resolve()
+        if FRONTEND not in file_path.parents and file_path != FRONTEND:
+            self.send_error(403)
+            return
+        if not file_path.exists() or not file_path.is_file():
+            self.send_error(404)
+            return
+
+        content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+        if content_type.startswith("text/") or content_type in {"application/javascript", "application/json"}:
+            content_type = f"{content_type}; charset=utf-8"
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(file_path.stat().st_size))
+        self.end_headers()
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
@@ -1168,20 +1207,21 @@ class Handler(BaseHTTPRequestHandler):
             if ".." in Path(member).parts:
                 self.send_error(403)
                 return
+            data = None
             try:
                 with zipfile.ZipFile(PATHOLOGY_ASSET_ZIP) as archive:
                     data = archive.read(member)
             except Exception:
-                self.send_error(404)
+                data = None
+            if data is not None:
+                content_type = mimetypes.guess_type(member)[0] or "application/octet-stream"
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Cache-Control", "public, max-age=3600")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
                 return
-            content_type = mimetypes.guess_type(member)[0] or "application/octet-stream"
-            self.send_response(200)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Cache-Control", "public, max-age=3600")
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
-            return
         file_path = (FRONTEND / path.lstrip("/")).resolve()
         if FRONTEND not in file_path.parents and file_path != FRONTEND:
             self.send_error(403)
@@ -1204,12 +1244,37 @@ class Handler(BaseHTTPRequestHandler):
         print(f"[{self.log_date_time_string()}] {fmt % args}")
 
 
+def ensure_pathology_patch_assets() -> None:
+    if not PATHOLOGY_ASSET_ZIP.exists():
+        return
+
+    existing = list(PATHOLOGY_ASSET_DIR.rglob("*.jpg")) if PATHOLOGY_ASSET_DIR.exists() else []
+    if existing:
+        return
+
+    PATHOLOGY_ASSET_DIR.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(PATHOLOGY_ASSET_ZIP) as archive:
+        for info in archive.infolist():
+            if info.is_dir():
+                continue
+            member = Path(info.filename)
+            if member.is_absolute() or ".." in member.parts:
+                continue
+            target = (PATHOLOGY_ASSET_DIR / member).resolve()
+            if PATHOLOGY_ASSET_DIR not in target.parents:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(archive.read(info.filename))
+    print(f"Extracted pathology patches to {PATHOLOGY_ASSET_DIR}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the portable online TNBC system.")
     default_port = int(os.environ.get("PORT") or os.environ.get("TNBC_ONLINE_PORT", "8020"))
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=default_port)
     args = parser.parse_args()
+    ensure_pathology_patch_assets()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"TNBC online system: http://{args.host}:{args.port}/")
     server.serve_forever()
